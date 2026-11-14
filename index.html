@@ -1,0 +1,125 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#fcc514">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.json">
+    <title>Clipher Forge Global | Global Digital Asset Exchange</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="apple-touch-icon" href="/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#fcc514',
+                        secondary: '#f7a600',
+                        positive: '#00c087',
+                        negative: '#ff4d4f',
+                        darkBg: '#06070d',
+                        gold: {
+                            DEFAULT: '#d4af37',
+                            light: '#f1d592',
+                            dark: '#aa8c2e',
+                            metallic: '#b8860b'
+                        }
+                    },
+                    backgroundImage: {
+                        'gold-gradient': 'linear-gradient(135deg, #f1d592 0%, #d4af37 50%, #aa8c2e 100%)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            color: #333;
+            margin: 0;
+            padding-bottom: 70px;
+        }
+
+        .ticker-scroll {
+            white-space: nowrap;
+            overflow: hidden;
+            box-sizing: border-box;
+            background: white;
+            padding: 8px 0;
+        }
+
+        .ticker-scroll p {
+            display: inline-block;
+            padding-left: 100%;
+            animation: ticker 35s linear infinite;
+            font-size: 11px;
+            color: #666;
+            margin: 0;
+        }
+
+        @keyframes ticker {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-100%, 0); }
+        }
+
+        .animate-marquee {
+            animation: marquee 20s linear infinite;
+        }
+
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .spin-float {
+            position: fixed;
+            bottom: 85px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: #fcc514;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 40;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "axios": "https://esm.sh/axios@^1.13.2",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+  }
+}
+</script>
+<script src="https://js.hcaptcha.com/1/api.js?render=explicit" async defer></script>
+</head>
+<body class="bg-white">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
