@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 
 const API_URL = '';
@@ -26,7 +26,7 @@ interface RechargeModalProps {
 }
 
 type Method = 'USDT' | 'NGN';
-type RechargeStep = 'METHOD' | 'USDT_ADDRESS' | 'NGN_ADDRESS' | 'SENT' | 'SUCCESS';
+type RechargeStep = 'METHOD' | 'USDT_ADDRESS' | 'NGN_ADDRESS' | 'SENT' | 'SUCCESS' | 'VERIFY';
 
 const RechargeModal: React.FC<RechargeModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [step, setStep] = useState<RechargeStep>('METHOD');
@@ -41,6 +41,10 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ isOpen, onClose, onSucces
   const [receiptName, setReceiptName] = useState('');
   const [receiptBase64, setReceiptBase64] = useState('');
   const [receiptType, setReceiptType] = useState('');
+  const [txHash, setTxHash] = useState('');
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [platformAddress, setPlatformAddress] = useState<string>('');
+  const [platformChain, setPlatformChain] = useState<string>('TRC20');
 
   const resetAndClose = () => {
     setStep('METHOD');
@@ -49,6 +53,9 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ isOpen, onClose, onSucces
     setCopied(null);
     setError('');
     setReceiptName(''); setReceiptBase64(''); setReceiptType('');
+    setTxHash('');
+    setVerifyLoading(false);
+    setPlatformAddress(''); setPlatformChain('TRC20');
     onClose();
   };
 
@@ -60,11 +67,27 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ isOpen, onClose, onSucces
       setCopied(null);
       setError('');
       setReceiptName(''); setReceiptBase64(''); setReceiptType('');
+      setTxHash('');
+      setVerifyLoading(false);
+      setPlatformAddress(''); setPlatformChain('TRC20');
       setAssignedBank(getRandomBank());
       setChain('TRC20');
       setAssignedAddress(getRandomAddress(TRON_USDT_ADDRESSES));
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const loadRechargeInfo = async () => {
+      try {
+        const res = await api.get('/api/recharge/info');
+        if (res.data?.address) {
+          setPlatformAddress(res.data.address);
+          setPlatformChain(res.data.chain || 'TRC20');
+        }
+      } catch {}
+    };
+    loadRechargeInfo();
+  }, []);
 
   const onReceiptFile = (file?: File | null) => {
     if (!file) return;
@@ -99,6 +122,21 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ isOpen, onClose, onSucces
       setStep('SENT');
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Failed to submit deposit. Please try again.');
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!txHash || txHash.trim().length < 10) { setError('Enter a valid transaction hash'); return; }
+    setVerifyLoading(true);
+    setError('');
+    try {
+      const net = platformChain === 'BEP20' ? 'BEP20' : 'TRC20';
+      await api.post('/api/recharge/verify', { txHash: txHash.trim(), network: net });
+      setStep('SENT');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Verification failed. Please try again.');
+    } finally {
+      setVerifyLoading(false);
     }
   };
 
@@ -441,6 +479,55 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ isOpen, onClose, onSucces
                 className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all"
               >
                 Done
+              </button>
+              <button
+                onClick={() => setStep('VERIFY')}
+                className="w-full text-gray-400 text-xs font-bold uppercase mt-2"
+              >
+                Verify Transaction Hash On-Chain
+              </button>
+            </div>
+          )}
+
+          {/* Step: VERIFY TRANSACTION */}
+          {step === 'VERIFY' && (
+            <div className="p-6 space-y-5">
+              <div className="bg-primary/5 border border-primary/15 rounded-2xl p-4 text-center">
+                <i className="fa-solid fa-magnifying-glass text-primary text-2xl mb-2"></i>
+                <p className="text-xs font-black text-gray-800 uppercase tracking-wide">Verify Deposit Transaction</p>
+                <p className="text-[10px] text-gray-500 mt-1">Enter your on-chain transaction hash to verify the deposit.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Transaction Hash</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={txHash}
+                    onChange={e => setTxHash(e.target.value)}
+                    placeholder="0x..."
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 pl-4 pr-4 text-gray-800 font-mono text-sm focus:ring-1 focus:ring-primary outline-none"
+                  />
+                </div>
+                {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
+              </div>
+
+              <p className="text-[10px] text-gray-500 text-center">
+                Platform address: <code className="text-primary font-mono text-[10px] truncate block">{platformAddress || 'Loading...'}</code> ({platformChain})
+              </p>
+
+              <button
+                onClick={handleVerify}
+                disabled={verifyLoading || !txHash || txHash.trim().length < 10}
+                className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-40 shadow-md"
+              >
+                {verifyLoading ? 'Verifying...' : 'Verify Transaction'}
+              </button>
+              <button
+                onClick={() => setStep('METHOD')}
+                className="w-full text-gray-400 text-xs font-bold uppercase"
+              >
+                Go Back
               </button>
             </div>
           )}

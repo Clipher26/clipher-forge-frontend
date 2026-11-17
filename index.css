@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900;
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding-bottom: 70px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+  }
+
+  .ticker-scroll {
+    @apply whitespace-nowrap overflow-hidden;
+    background: white;
+    padding: 8px 0;
+  }
+
+  .ticker-scroll p {
+    @apply inline-block text-[10px] font-bold text-gray-600;
+    padding-left: 100%;
+    animation: ticker 35s linear infinite;
+    margin: 0;
+  }
+
+  .animate-marquee {
+    animation: marquee 20s linear infinite;
+  }
+
+  .spin-float {
+    position: fixed;
+    bottom: 85px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: #fcc514;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 40;
+    animation: bounce 2s infinite;
+  }
+}
+
+@layer utilities {
+  .text-positive {
+    @apply text-green-600;
+  }
+  .text-negative {
+    @apply text-red-600;
+  }
+  .bg-positive {
+    @apply bg-green-100 text-green-800;
+  }
+  .bg-negative {
+    @apply bg-red-100 text-red-800;
+  }
+}

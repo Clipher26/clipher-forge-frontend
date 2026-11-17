@@ -1,6 +1,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { TickerData, User } from '../types';
+import api from '../api';
 
 interface TradeViewProps {
   symbol: string;
@@ -16,6 +17,21 @@ const TradeView: React.FC<TradeViewProps> = ({ symbol, ticker, onBack, user, onP
   const [tradeDirection, setTradeDirection] = useState<'CALL' | 'PUT'>('CALL');
   const [selectedPeriod, setSelectedPeriod] = useState<{ label: string; yield: number }>({ label: '60 S', yield: 0.30 });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resettling, setResettling] = useState(false);
+
+  const handleResettle = async () => {
+    setResettling(true);
+    try {
+      const res = await api.post('/api/trades/resettle');
+      if (res.data.success) {
+        alert(`Trade resettle complete: ${res.data.settled} trades settled.`);
+      }
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Resettle failed');
+    } finally {
+      setResettling(false);
+    }
+  };
 
   const periods = [
     { label: '60 S', yield: 0.30 },
@@ -77,9 +93,14 @@ const TradeView: React.FC<TradeViewProps> = ({ symbol, ticker, onBack, user, onP
       {/* Top Header */}
       <header className="h-14 flex items-center px-4 justify-between shrink-0">
         <h2 className="text-gray-800 font-bold text-sm">{symbol.replace('USDT', '')}/USDT</h2>
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-600">
-          <i className="fa-solid fa-xmark text-xl"></i>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleResettle} disabled={resettling} className="text-[10px] font-black text-primary uppercase disabled:opacity-50 active:scale-95 transition-all px-2 py-1 rounded bg-primary/10">
+            {resettling ? 'Resettling...' : 'Resettle'}
+          </button>
+          <button onClick={onBack} className="text-gray-400 hover:text-gray-600">
+            <i className="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">

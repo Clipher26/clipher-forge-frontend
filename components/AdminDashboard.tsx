@@ -6,6 +6,7 @@ import AdminMessenger from './AdminMessenger';
 import AdminWithdrawals from './AdminWithdrawals';
 import AdminSignalPanel from './AdminSignalPanel';
 import AdminInvestments from './AdminInvestments';
+import AdminCfMessenger from './AdminCfMessenger';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -55,6 +56,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [tempWallet, setTempWallet] = useState(adminWalletAddress);
   const [sessions, setSessions] = useState<any[]>([]);
   const [withdrawalAuths, setWithdrawalAuths] = useState<WithdrawalRow[]>([]);
+  const [creditUserId, setCreditUserId] = useState('');
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditLoading, setCreditLoading] = useState(false);
+  const [creditMsg, setCreditMsg] = useState('');
+  const [userDetail, setUserDetail] = useState<any | null>(null);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [createUserLoading, setCreateUserLoading] = useState(false);
+  const [newUserData, setNewUserData] = useState({ name: '', email: '', phone: '', role: 'Member' });
 
   const loadSalary = async () => {
     try {
@@ -125,6 +134,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert(e?.response?.data?.message || e?.message || 'Failed to clear recharge');
     }
   };
+
+  const loadUserDetail = async (userId: string) => {
+    try {
+      const res = await api.get(`/api/users/${userId}`);
+      setUserDetail(res.data);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to load user detail');
+    }
+  };
+
+  const handleCreateUser = async () => {
+    setCreateUserLoading(true);
+    try {
+      await api.post('/api/users', newUserData);
+      setNewUserData({ name: '', email: '', phone: '', role: 'Member' });
+      await loadAdminUsers();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to create user');
+    } finally {
+      setCreateUserLoading(false);
+    }
+  };
   const safeUsers = Array.isArray(usersList) && usersList.length ? usersList : (Array.isArray(users) ? users : []);
   const validatedCount = safeUsers.filter(u => u.isValidated).length;
 
@@ -139,7 +170,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar max-w-full">
           <div className="flex bg-black/20 rounded-lg p-1">
-            {['USERS', 'SALARY', 'INVESTMENT', 'WITHDRAWALS', 'MESSAGES', 'SIGNALS', 'WD_AUTH', 'TREASURY', 'SESSIONS'].map((tab: any) => (
+            {['USERS', 'SALARY', 'INVESTMENT', 'WITHDRAWALS', 'MESSAGES', 'SIGNALS', 'WD_AUTH', 'TREASURY', 'SESSIONS', 'CF_MESSENGER'].map((tab: any) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -172,7 +203,82 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="flex-1 overflow-y-auto bg-[#0a0a0c]">
         {activeTab === 'USERS' && (
           <div className="p-4 overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[600px]">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <button
+                  onClick={() => { setIsCreatingUser(!isCreatingUser); setUserDetail(null); }}
+                  className="text-[10px] text-bybit font-black uppercase flex items-center gap-1"
+                >
+                  <i className="fa-solid fa-plus"></i> Create User
+                </button>
+              </div>
+              {userDetail && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setUserDetail(null)}
+                    className="text-[10px] text-gray-400 font-black uppercase"
+                  >
+                    Close Detail
+                  </button>
+                </div>
+              )}
+            </div>
+            {userDetail && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
+                <h3 className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">User Detail</h3>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div><span className="text-gray-500">Name</span><p className="text-white font-bold">{userDetail.name}</p></div>
+                  <div><span className="text-gray-500">Email</span><p className="text-white font-mono">{userDetail.email}</p></div>
+                  <div><span className="text-gray-500">Phone</span><p className="text-white font-mono">{userDetail.phone || 'N/A'}</p></div>
+                  <div><span className="text-gray-500">Balance</span><p className="text-green-500 font-mono">${Number(userDetail.balance || 0).toFixed(2)}</p></div>
+                  <div><span className="text-gray-500">Unlock</span><p className="text-yellow-500 font-mono">${Number(userDetail.unlockBalance || 0).toFixed(2)}</p></div>
+                  <div><span className="text-gray-500">Role</span><p className="text-bybit font-bold">{userDetail.role}</p></div>
+                </div>
+              </div>
+            )}
+            {isCreatingUser && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
+                <h3 className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">Create New User</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    value={newUserData.name}
+                    onChange={e => setNewUserData({...newUserData, name: e.target.value})}
+                    placeholder="Full Name"
+                    className="bg-black border border-white/10 rounded-xl py-3 px-4 text-white outline-none"
+                  />
+                  <input
+                    value={newUserData.email}
+                    onChange={e => setNewUserData({...newUserData, email: e.target.value})}
+                    placeholder="Email"
+                    className="bg-black border border-white/10 rounded-xl py-3 px-4 text-white outline-none"
+                  />
+                  <input
+                    value={newUserData.phone}
+                    onChange={e => setNewUserData({...newUserData, phone: e.target.value})}
+                    placeholder="Phone"
+                    className="bg-black border border-white/10 rounded-xl py-3 px-4 text-white outline-none"
+                  />
+                  <select
+                    value={newUserData.role}
+                    onChange={e => setNewUserData({...newUserData, role: e.target.value})}
+                    className="bg-black border border-white/10 rounded-xl py-3 px-4 text-white outline-none"
+                  >
+                    <option value="Member">Member</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Senior Officer">Senior Officer</option>
+                  </select>
+                  <button
+                    onClick={handleCreateUser}
+                    disabled={createUserLoading}
+                    className="col-span-2 bg-bybit text-white py-3 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {createUserLoading ? 'Creating...' : 'Create User'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {!userDetail && !isCreatingUser && (
+              <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="text-[10px] text-gray-500 uppercase font-black tracking-widest border-b border-white/10">
                   <th className="pb-4 pl-2">Operator Node</th>
@@ -188,8 +294,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="py-4 pl-2">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 font-mono text-xs">{user.name.charAt(0)}</div>
-                        <div>
-                          <p className="text-white font-bold text-xs">{user.name}</p>
+                          <div>
+                            <p className="text-white font-bold text-xs cursor-pointer hover:underline" onClick={() => loadUserDetail(user.id)}>
+                              {user.name}
+                            </p>
+                          </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <p className="text-[8px] text-gray-500 font-mono">{user.id}</p>
                             <span className={`text-[7px] font-black uppercase px-1 rounded-sm ${user.role === 'Senior Officer' || user.name === 'Akinro John' ? 'bg-gold-gradient text-[#5c4014]' : (user.role === 'Admin' ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-400')}`}>
@@ -197,8 +306,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </span>
                           </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
                     <td className="py-4">
                       <p className="text-white font-mono text-[10px]">{user.phone || 'N/A'}</p>
                       <p className="text-gray-500 text-[8px] uppercase font-bold tracking-tight truncate max-w-[120px]">{user.deviceInfo || 'Unknown Device'}</p>
@@ -223,8 +331,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
@@ -325,6 +434,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {isEditingWallet ? <input type="text" value={tempWallet} onChange={(e) => setTempWallet(e.target.value)} className="w-full bg-black border border-bybit/30 rounded-xl py-4 px-6 text-white font-mono text-xs outline-none" placeholder="T..." /> : <div className="bg-black/50 border border-white/5 rounded-xl py-4 px-6 flex items-center justify-between"><code className="text-white font-mono text-xs">{adminWalletAddress || 'UNSET'}</code><i className="fa-solid fa-lock text-gray-700"></i></div>}
             </div>
             <button onClick={onWithdrawTax} className="w-full bg-red-600 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-lg hover:bg-white hover:text-red-600 transition-all active:scale-95">Liquify All Revenue</button>
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4 mt-6">
+              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Manual Deposit Credit (Admin)</p>
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  value={creditUserId}
+                  onChange={e => setCreditUserId(e.target.value)}
+                  placeholder="User ID"
+                  className="col-span-2 bg-black border border-white/10 rounded-xl py-4 px-6 text-white outline-none"
+                />
+                <input
+                  type="number"
+                  value={creditAmount}
+                  onChange={e => setCreditAmount(e.target.value)}
+                  placeholder="Amount (USDT)"
+                  className="bg-black border border-white/10 rounded-xl py-4 px-6 text-white outline-none"
+                />
+                <button
+                  onClick={async () => {
+                    if (!creditUserId || !creditAmount || Number(creditAmount) <= 0) { setCreditMsg('Enter valid user ID and amount'); return; }
+                    setCreditLoading(true);
+                    setCreditMsg('');
+                    try {
+                      await api.post('/api/recharge/credit', { userId: creditUserId, amount: Number(creditAmount) });
+                      setCreditMsg(`Credited $${Number(creditAmount).toFixed(2)} to user ${creditUserId}`);
+                      setCreditUserId(''); setCreditAmount('');
+                    } catch (e: any) {
+                      setCreditMsg(e?.response?.data?.message || 'Credit failed');
+                    } finally {
+                      setCreditLoading(false);
+                    }
+                  }}
+                  disabled={creditLoading}
+                  className="col-span-2 bg-bybit text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {creditLoading ? 'Crediting...' : 'Credit Deposit'}
+                </button>
+                {creditMsg && <p className={`col-span-2 text-[10px] font-bold text-center ${creditMsg.startsWith('Credited') ? 'text-bybit' : 'text-red-400'}`}>{creditMsg}</p>}
+              </div>
+            </div>
           </div>
         )}
 
@@ -334,6 +483,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {activeTab === 'MESSAGES' && (
           <AdminMessenger />
+        )}
+
+        {activeTab === 'CF_MESSENGER' && (
+          <AdminCfMessenger />
         )}
 
         {activeTab === 'WD_AUTH' && (

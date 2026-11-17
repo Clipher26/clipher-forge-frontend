@@ -29,16 +29,38 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, user, on
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showWithdrawPin, setShowWithdrawPin] = useState(false);
   const [msg, setMsg] = useState('');
+  const [recoveryLink, setRecoveryLink] = useState<string | null>(null);
 
   const loadMfa = async () => {
     try {
       const supabase = getSupabase();
       const { data } = await supabase.auth.mfa.listFactors();
-      // listFactors().totp only contains *verified* factors; .all also exposes a half-finished
-      // enrollment, which is why the row used to read "Disabled" even though a factor existed.
       setMfaEnabled(!!(data?.totp && data.totp.length > 0));
       setMfaPending(!!(data?.all || []).some((f: any) => f.factor_type === 'totp' && f.status !== 'verified'));
     } catch { setMfaEnabled(false); setMfaPending(false); }
+  };
+
+  const handleMfaToggle = async (enable: boolean) => {
+    if (enable === null || enable === undefined) return;
+    if (!enable) {
+      // Disable MFA directly via Supabase
+      try {
+        const supabase = getSupabase();
+        const { data: factors } = await supabase.auth.mfa.listFactors();
+        const verified = (factors?.totp || []).find((f: any) => f.status === 'verified');
+        if (verified) {
+          await supabase.auth.mfa.unenroll({ factorId: verified.id });
+        }
+        setMfaEnabled(false);
+        setMsg('MFA disabled');
+      } catch (e: any) {
+        setMfaEnabled(true); // revert toggle
+        setMsg(e?.message || 'Failed to disable MFA');
+      }
+      return;
+    }
+    // Enable → open enrollment modal (QR scan required)
+    setShowMfa(true);
   };
 
   const handlePinSet = async () => {
@@ -56,11 +78,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, user, on
     const email = String(user?.email || '').trim().toLowerCase();
     if (!email) { setMsg('No email on account. Contact support.'); return; }
     try {
-      await api.post('/api/auth/forgot-password', { email });
-      setMsg('Reset email sent. Check your inbox/spam.');
+      const res = await api.post('/api/auth/forgot-password', { email, redirectTo: window.location.origin });
+      if (res.data?.recoveryLink) {
+        setRecoveryLink(res.data.recoveryLink);
+        setMsg('Recovery link generated. Copy it below to reset your password.');
+      } else {
+        setMsg(res.data?.message || 'Reset email sent. Check your inbox/spam.');
+      }
     } catch (e: any) {
-      try { const { error } = await getSupabase().auth.resetPasswordForEmail(email, { redirectTo: window.location.origin }); if (error) throw error; setMsg('Reset email sent. Check your inbox/spam.'); }
-      catch (e2: any) { setMsg(e2?.message || 'Failed to send reset email'); }
+      setMsg(e?.response?.data?.message || e?.message || 'Failed to send reset email');
     }
   };
 
@@ -82,7 +108,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, user, on
         </header>
 
         <div className="p-4 space-y-4">
-<div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-50"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Security</p></div>
             <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
               <div>
@@ -91,12 +117,40 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, user, on
               </div>
               <button onClick={() => setShowPassword(true)} className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center" title="Reset/Change password"><i className="fa-solid fa-rotate-right"></i></button>
             </div>
-            <Row icon="fa-solid fa-shield-halved" label="MFA (Multi-Factor Authentication)" value={mfaEnabled == null ? '...' : (mfaEnabled ? 'Enabled' : (mfaPending ? 'Pending' : 'Disabled'))} onClick={() => setShowMfa(true)} />
+            <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-bold text-gray-800">MFA (Two-Factor Authentication)</p>
+                <p className="text-[10px] text-gray-400">Require authenticator code on sign in</p>
+              </div>
+              <button
+                onClick={() => { if (mfaEnabled) handleMfaToggle(false); else setShowMfa(true); }}
+                className={`relative w-12 h-7 rounded-full ${mfaEnabled ? 'bg-primary' : 'bg-gray-200'} transition-colors`}
+              >
+                <span className={`absolute top-1 ${mfaEnabled ? 'right-2' : 'left-2'} w-5 h-5 rounded-full bg-white transition-transform transform ${mfaEnabled ? 'translate-x-4' : 'translate-x-0'}`}></span>
+              </button>
+            </div>
             <Row icon="fa-solid fa-lock" label="Withdrawal PIN" value={(user as any)?.withdrawalPin ? 'Set' : 'Not set'} onClick={() => setShowWithdrawPin(true)} />
             <Row icon="fa-solid fa-envelope-circle-check" label="Forgot password (send reset email)" onClick={forgotPassword} />
           </div>
 
           {msg && <p className="text-xs font-bold text-primary bg-white border border-gray-100 rounded-xl p-3">{msg}</p>}
+          {recoveryLink && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-4">
+              <p className="text-xs text-yellow-800 font-bold uppercase mb-2">Recovery Link</p>
+              <input
+                type="text"
+                value={recoveryLink}
+                readOnly
+                className="w-full bg-white border border-yellow-300 rounded-lg py-2 px-3 text-xs font-mono text-yellow-900 outline-none select-all"
+              />
+              <button
+                onClick={() => navigator.clipboard.writeText(recoveryLink).then(() => setMsg('Link copied to clipboard.'))}
+                className="w-full mt-2 bg-yellow-600 text-white py-2 rounded-lg font-black uppercase text-xs hover:bg-yellow-700 transition-colors"
+              >
+                Copy Link
+              </button>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-50"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Account</p></div>

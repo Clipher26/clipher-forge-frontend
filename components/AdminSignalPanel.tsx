@@ -62,6 +62,20 @@ const AdminSignalPanel: React.FC<Props> = ({ onCreated }) => {
       setTodaySet(true);
       setCanSet(false);
       if (res.data?.resetAt) setResetAt(res.data.resetAt);
+
+      // Also send signal countdown to CF Messenger (Telegram channel)
+      try {
+        const signalName = `${symbol} ${direction}`;
+        await api.post('/api/admin/cf-messenger/signal-countdown', {
+          signalName,
+          secondsRemaining: 600, // 10 minutes = 600 seconds
+        });
+        setMsg((prev: string) => prev + ' Countdown sent to Telegram channel.');
+      } catch (cfErr: any) {
+        console.warn('CF Messenger countdown failed:', cfErr?.response?.data?.message || cfErr?.message);
+        setMsg((prev: string) => prev + ' (Countdown to channel failed)');
+      }
+
       onCreated?.();
       await load();
     } catch (e: any) {

@@ -13,7 +13,7 @@ const ContractOrderModal: React.FC<ContractOrderModalProps> = ({ isOpen, onClose
 
   const now = Date.now();
   const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-  const weeklyTrades = trades.filter(t => (now - t.timestamp) < oneWeekMs);
+  const weeklyTrades = trades.filter(t => t.timestamp != null && (now - t.timestamp) < oneWeekMs);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-0 md:p-4">

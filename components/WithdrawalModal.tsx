@@ -21,7 +21,7 @@ interface WithdrawalModalProps {
 }
 
 type WithdrawalChain = 'TRC20' | 'BEP20';
-type WithdrawalStep = 'AMOUNT' | 'CONFIRM' | 'PIN' | 'PROCESSING' | 'SUCCESS' | 'BLOCKED' | 'NO_ADDRESS' | 'NO_PIN';
+type WithdrawalStep = 'AMOUNT' | 'CONFIRM' | 'OTP_VERIFY' | 'PIN' | 'PROCESSING' | 'SUCCESS' | 'BLOCKED' | 'NO_ADDRESS' | 'NO_PIN';
 
 const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   isOpen,
@@ -34,9 +34,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   const [chain, setChain] = useState<WithdrawalChain>('TRC20');
   const [amount, setAmount] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpSending, setOtpSending] = useState(false);
-  const [devCode, setDevCode] = useState('');
+  const [otpVerifying, setOtpVerifying] = useState(false);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -69,9 +67,6 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     if (isOpen) {
       setAmount('');
       setOtpCode('');
-      setOtpSent(false);
-      setOtpSending(false);
-      setDevCode('');
       setPin('');
       setError('');
       setChain('TRC20');
@@ -125,25 +120,25 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     setStep('CONFIRM');
   };
 
-  const handleSendOtp = async () => {
-    setOtpSending(true);
+  const handleConfirm = () => {
+    if (!otpCode || otpCode.trim().length !== 6) { setError('Enter the 6-digit code from the Telegram bot'); return; }
     setError('');
-    try {
-      const res = await api.post('/api/withdrawals/otp/request');
-      setOtpSent(true);
-      // Dev fallback: when SMTP is not configured the API returns the code so the flow can be tested.
-      if (res.data?.devCode) setDevCode(String(res.data.devCode));
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Failed to send verification code');
-    } finally {
-      setOtpSending(false);
-    }
+    setStep('OTP_VERIFY');
   };
 
-  const handleConfirm = async () => {
-    if (!otpCode || otpCode.trim().length < 4) { setError('Enter the verification code sent to your email'); return; }
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.trim().length !== 6) { setError('Enter the 6-digit code from the Telegram bot'); return; }
+    setOtpVerifying(true);
     setError('');
-    setStep('PIN');
+    try {
+      await api.post('/api/withdrawals/otp/verify', { code: otpCode.trim() });
+      setStep('PIN');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Invalid or expired code. Please get a new one from the Telegram bot.');
+      setStep('CONFIRM');
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   const handlePinConfirm = async () => {
@@ -371,28 +366,77 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                   <code className="font-mono text-gray-600 text-[10px] max-w-[160px] truncate">{address}</code>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Verification Code</p>
-                  <button onClick={handleSendOtp} disabled={otpSending} className="text-[10px] font-black text-primary uppercase disabled:opacity-50">{otpSending ? 'Sending...' : otpSent ? 'Resend' : 'Send Code'}</button>
-                </div>
-                <input type="text" inputMode="numeric" value={otpCode} onChange={e => setOtpCode(e.target.value)} placeholder="Enter 6-digit code" className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest focus:ring-1 focus:ring-primary outline-none" />
-                {otpSent && <p className="text-[10px] text-green-600 font-bold text-center">Code sent to your email. Expires in 10 minutes.</p>}
-                {devCode && (
-                  <button
-                    type="button"
-                    onClick={() => { setOtpCode(devCode); setError(''); }}
-                    className="w-full bg-yellow-50 border border-yellow-200 rounded-xl p-2 text-[10px] font-black text-yellow-700 uppercase"
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Get Verification Code</p>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                  <p className="text-[11px] text-gray-700 text-center leading-relaxed">
+                    We no longer send codes via email. Please get your 6-digit withdrawal code from our Telegram bot:
+                  </p>
+                  <a
+                    href="https://t.me/CF_withdrawVerify_bot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black uppercase text-sm hover:bg-blue-700 transition-all"
                   >
-                    Dev code: {devCode} — tap to use
-                  </button>
-                )}
+                    <i className="fa-brands fa-telegram text-lg"></i>
+                    Open CF Withdrawal Verification Bot
+                  </a>
+                  <p className="text-[9px] text-gray-500 text-center">
+                    Message the bot with your email/username to receive your withdrawal code.
+                  </p>
+                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value)}
+                  placeholder="Enter 6-digit code from Telegram bot"
+                  maxLength={6}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
+                />
                 {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
               </div>
               <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3">
                 <p className="text-[10px] text-yellow-700 font-bold text-center uppercase">
                   Withdrawals are processed within 24 hours
                 </p>
+              </div>
+            </div>
+          )}
+
+          {step === 'OTP_VERIFY' && (
+            <div className="space-y-5">
+              <div className="bg-primary/5 border border-primary/15 rounded-2xl p-5 text-center">
+                <i className="fa-solid fa-shield-halved text-primary text-2xl mb-2"></i>
+                <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-2">Verify Code</p>
+                <p className="text-xs text-gray-400 mt-1">Enter the 6-digit code from the Telegram bot.</p>
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value)}
+                  placeholder="Enter 6-digit code"
+                  maxLength={6}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
+                />
+                {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
+              </div>
+              <div className="pt-2 space-y-3">
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={otpVerifying || otpCode.trim().length !== 6}
+                  className="w-full bg-primary text-white py-4 rounded-md font-bold text-lg active:scale-[0.98] transition-all shadow-sm disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {otpVerifying ? <><i className="fa-solid fa-spinner animate-spin"></i> Verifying...</> : 'Verify Code'}
+                </button>
+                <button
+                  onClick={() => { setStep('CONFIRM'); setOtpCode(''); }}
+                  className="w-full text-gray-400 text-xs font-bold uppercase py-2"
+                >
+                  Go Back
+                </button>
               </div>
             </div>
           )}

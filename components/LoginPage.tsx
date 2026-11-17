@@ -25,6 +25,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, onSignUpC
   const captchaRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<any>(null);
   const [hcaptchaSiteKey, setHcaptchaSiteKey] = useState(getConfig().hcaptchaSiteKey || '');
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotRecoveryLink, setForgotRecoveryLink] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConfig().then((c) => {
@@ -119,6 +124,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, onSignUpC
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgotPassword = async () => {
+    const em = email.trim().toLowerCase();
+    if (!em || !em.includes('@')) { setForgotError('Enter your email address above first'); return; }
+    setForgotLoading(true); setForgotError(''); setForgotMsg(''); setForgotRecoveryLink(null);
+    try {
+      const res = await api.post('/api/auth/forgot-password', { email: em, redirectTo: window.location.origin });
+      if (res.data?.recoveryLink) {
+        setForgotRecoveryLink(res.data.recoveryLink);
+        setForgotMsg('Recovery link generated. Copy it below to reset your password.');
+      } else {
+        setForgotMsg(res.data?.message || 'Password reset email sent. Check your inbox/spam.');
+      }
+    } catch (e: any) {
+      setForgotError(e?.response?.data?.message || e?.message || 'Failed to send reset email');
+    } finally { setForgotLoading(false); }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSignIn(); };
@@ -220,9 +242,36 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, onSignUpC
           </div>
 
           <div className="text-center pt-4 space-y-2">
-            <button onClick={onForgetPassword} className="text-gray-900 font-medium text-base hover:text-primary transition-colors">
+            <button onClick={() => { setShowForgot(v => !v); setForgotMsg(''); setForgotError(''); }} className="text-gray-900 font-medium text-base hover:text-primary transition-colors">
               Forgot password?
             </button>
+            {showForgot && (
+              <div className="mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2 text-left">
+                <p className="text-[11px] text-gray-600">We’ll send a password reset link to <span className="font-bold">{email.trim() || 'your email'}</span>.</p>
+                {forgotMsg && <p className="text-[11px] text-green-700 font-bold">{forgotMsg}</p>}
+                {forgotError && <p className="text-[11px] text-red-600 font-bold">{forgotError}</p>}
+                {forgotRecoveryLink && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-[10px] text-yellow-800 font-bold uppercase mb-1">Recovery Link</p>
+                    <input
+                      type="text"
+                      value={forgotRecoveryLink}
+                      readOnly
+                      className="w-full bg-white border border-yellow-300 rounded py-1 px-2 text-[10px] font-mono text-yellow-900 outline-none select-all"
+                    />
+                    <button
+                      onClick={() => navigator.clipboard.writeText(forgotRecoveryLink).then(() => setForgotMsg('Link copied to clipboard.'))}
+                      className="w-full mt-1 bg-yellow-600 text-white py-1 rounded font-black uppercase text-[10px] hover:bg-yellow-700 transition-colors"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+                )}
+                <button onClick={handleForgotPassword} disabled={forgotLoading} className="w-full bg-primary text-white py-2 rounded-lg text-xs font-black uppercase disabled:opacity-60">
+                  {forgotLoading ? 'Sending...' : 'Send reset email'}
+                </button>
+              </div>
+            )}
           </div>
             </>
           )}

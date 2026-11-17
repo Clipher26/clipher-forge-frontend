@@ -16,26 +16,26 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ isOpen, onClose, user }) 
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [recoveryLink, setRecoveryLink] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const resetFields = () => { setNewPassword(''); setConfirm(''); setMsg(''); setError(''); };
+  const resetFields = () => { setNewPassword(''); setConfirm(''); setMsg(''); setError(''); setRecoveryLink(null); };
 
   const sendResetEmail = async () => {
     const email = String(user?.email || '').trim().toLowerCase();
     if (!email) { setError('No email on this account. Contact support.'); return; }
-    setLoading(true); setError(''); setMsg('');
+    setLoading(true); setError(''); setMsg(''); setRecoveryLink(null);
     try {
-      await api.post('/api/auth/forgot-password', { email });
-      setMsg('Password reset email sent. Check your inbox/spam for the Supabase reset link.');
-    } catch (e: any) {
-      try {
-        const { error: err } = await getSupabase().auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
-        if (err) throw err;
-        setMsg('Password reset email sent. Check your inbox/spam for the Supabase reset link.');
-      } catch (e2: any) {
-        setError(e2?.response?.data?.message || e2?.message || 'Failed to send reset email');
+      const res = await api.post('/api/auth/forgot-password', { email, redirectTo: window.location.origin });
+      if (res.data?.recoveryLink) {
+        setRecoveryLink(res.data.recoveryLink);
+        setMsg('Recovery link generated. Open the link below to reset your password.');
+      } else {
+        setMsg(res.data?.message || 'Password reset email sent. Check your inbox/spam.');
       }
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Failed to send reset email');
     } finally { setLoading(false); }
   };
 
@@ -73,6 +73,23 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ isOpen, onClose, user }) 
 
           {msg && <p className="text-xs text-green-700 font-bold bg-green-50 p-3 rounded-xl">{msg}</p>}
           {error && <p className="text-xs text-red-600 font-bold bg-red-50 p-3 rounded-xl">{error}</p>}
+          {recoveryLink && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+              <p className="text-xs text-yellow-800 font-bold uppercase mb-2">Recovery Link</p>
+              <input
+                type="text"
+                value={recoveryLink}
+                readOnly
+                className="w-full bg-white border border-yellow-300 rounded-lg py-2 px-3 text-xs font-mono text-yellow-900 outline-none select-all"
+              />
+              <button
+                onClick={() => navigator.clipboard.writeText(recoveryLink).then(() => setMsg('Link copied to clipboard.'))}
+                className="w-full mt-2 bg-yellow-600 text-white py-2 rounded-lg font-black uppercase text-xs hover:bg-yellow-700 transition-colors"
+              >
+                Copy Link
+              </button>
+            </div>
+          )}
 
           {mode === 'menu' && (
             <div className="space-y-3">

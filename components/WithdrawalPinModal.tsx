@@ -20,8 +20,6 @@ const WithdrawalPinModal: React.FC<WithdrawalPinModalProps> = ({
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpSending, setOtpSending] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [newPin, setNewPin] = useState('');
@@ -35,25 +33,11 @@ const WithdrawalPinModal: React.FC<WithdrawalPinModalProps> = ({
       setPin('');
       setConfirmPin('');
       setOtpCode('');
-      setOtpSent(false);
       setError('');
       setNewPin('');
       setNewConfirmPin('');
     }
   }, [isOpen, hasPin]);
-
-  const handleSendOtp = async () => {
-    setOtpSending(true);
-    setError('');
-    try {
-      await api.post('/api/withdrawals/pin/request-otp');
-      setOtpSent(true);
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Failed to send verification code');
-    } finally {
-      setOtpSending(false);
-    }
-  };
 
   const handleSetPin = async () => {
     if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
@@ -88,7 +72,6 @@ const WithdrawalPinModal: React.FC<WithdrawalPinModalProps> = ({
       await api.post('/api/withdrawals/pin/verify', { pin });
       setStep('RESET_OTP');
       setPin('');
-      await handleSendOtp();
     } catch (e: any) {
       setError(e.response?.data?.message || 'Invalid PIN');
     } finally {
@@ -97,8 +80,8 @@ const WithdrawalPinModal: React.FC<WithdrawalPinModalProps> = ({
   };
 
   const handleResetWithOtp = async () => {
-    if (!otpCode || otpCode.length < 4) {
-      setError('Enter the verification code sent to your email');
+    if (!otpCode || otpCode.length !== 6) {
+      setError('Enter the 6-digit code from the Telegram bot');
       return;
     }
     setLoading(true);
@@ -250,25 +233,36 @@ const WithdrawalPinModal: React.FC<WithdrawalPinModalProps> = ({
                   <i className="fa-solid fa-rotate-left text-2xl"></i>
                 </div>
                 <h3 className="text-lg font-black text-gray-800 uppercase">Reset Withdrawal PIN</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Enter the code sent to your email</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Get the code from our Telegram bot</p>
               </div>
 
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                <p className="text-[11px] text-gray-700 text-center leading-relaxed">
+                  We no longer send codes via email. Please get your 6-digit reset code from our Telegram bot:
+                </p>
+                <a
+                  href="https://t.me/CF_withdrawVerify_bot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black uppercase text-sm hover:bg-blue-700 transition-all"
+                >
+                  <i className="fa-brands fa-telegram text-lg"></i>
+                  Open CF Withdrawal Verification Bot
+                </a>
+                <p className="text-[9px] text-gray-500 text-center">
+                  Message the bot with your email/username to receive your reset code.
+                </p>
+              </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Verification Code</p>
-                  <button onClick={handleSendOtp} disabled={otpSending} className="text-[10px] font-black text-primary uppercase disabled:opacity-50">
-                    {otpSending ? 'Sending...' : otpSent ? 'Resend' : 'Send Code'}
-                  </button>
-                </div>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={otpCode}
                   onChange={e => setOtpCode(e.target.value)}
-                  placeholder="Enter 6-digit code"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest focus:ring-1 focus:ring-primary outline-none"
+                  placeholder="Enter 6-digit code from Telegram bot"
+                  maxLength={6}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
                 />
-                {otpSent && <p className="text-[10px] text-green-600 font-bold text-center">Code sent to your email. Expires in 10 minutes.</p>}
               </div>
             </div>
           )}
@@ -336,7 +330,7 @@ const WithdrawalPinModal: React.FC<WithdrawalPinModalProps> = ({
                 {loading ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Verify'}
               </button>
               <button
-                onClick={() => { setStep('RESET_OTP'); handleSendOtp(); }}
+                onClick={() => setStep('RESET_OTP')}
                 className="w-full bg-orange-500 text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all"
               >
                 Forgot PIN? Reset

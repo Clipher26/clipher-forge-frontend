@@ -98,7 +98,9 @@ const AdminMessenger: React.FC<AdminMessengerProps> = ({ users: usersProp }) => 
         setFeedback({ ok: false, text: res.data?.message || 'Send failed.' });
       }
     } catch (e: any) {
-      setFeedback({ ok: false, text: e?.response?.data?.message || 'Send failed.' });
+      const status = e?.response?.status;
+      const msg = e?.response?.data?.message || e?.message || 'Send failed.';
+      setFeedback({ ok: false, text: status ? `(${status}) ${msg}` : msg });
     } finally {
       setSending(false);
     }
