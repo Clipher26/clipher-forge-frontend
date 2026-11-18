@@ -4,7 +4,6 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '..');
 
 export default defineConfig(({ mode }) => {
     // NOTE: The Gemini API key is NOT injected here anymore. It is served at
@@ -14,7 +13,7 @@ export default defineConfig(({ mode }) => {
     loadEnv(mode, __dirname, '');
     return {
       build: {
-        outDir: path.resolve(repoRoot, 'dist'),
+        outDir: 'dist',
         assetsDir: 'assets',
       },
       server: {
