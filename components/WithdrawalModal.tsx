@@ -166,8 +166,13 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     };
     sessionStorage.setItem('pendingWithdrawal', JSON.stringify(pending));
     setPendingWithdrawal(pending);
-    // Redirect to Telegram bot (full redirect works better than window.open on Vercel)
-    window.location.href = 'https://t.me/CF_withdrawVerify_bot';
+    // Pass the account email to the Telegram bot via deep-link start param so the
+    // bot generates the OTP for the same email the backend verifies against.
+    const email = String((user as any)?.email || '').trim().toLowerCase();
+    const botUrl = email
+      ? `https://t.me/CF_withdrawVerify_bot?start=${encodeURIComponent(email)}`
+      : 'https://t.me/CF_withdrawVerify_bot';
+    window.location.href = botUrl;
     setStep('OTP_VERIFY');
   };
 
@@ -189,10 +194,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     setOtpVerifying(true);
     setError('');
     try {
-      // First verify the OTP with the Telegram bot
-      await api.post('/api/withdrawals/otp/verify', { code: otpCode.trim() });
-      
-      // Then submit the withdrawal with PIN
+      // Submit the withdrawal with PIN; the backend verifies the OTP internally
       setIsProcessing(true);
       setStep('PROCESSING');
       
@@ -426,7 +428,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                   type="password"
                   inputMode="numeric"
                   value={pin}
-                  onChange={e => setPin(e.target.value)}
+                  onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="Enter 6-digit PIN"
                   maxLength={6}
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
@@ -487,7 +489,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                   type="text"
                   inputMode="numeric"
                   value={otpCode}
-                  onChange={e => setOtpCode(e.target.value)}
+                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="Enter 6-digit code from Telegram bot"
                   maxLength={6}
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
