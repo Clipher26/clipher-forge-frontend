@@ -21,7 +21,7 @@ interface WithdrawalModalProps {
 }
 
 type WithdrawalChain = 'TRC20' | 'BEP20';
-type WithdrawalStep = 'AMOUNT' | 'CONFIRM' | 'OTP_VERIFY' | 'PIN' | 'PROCESSING' | 'SUCCESS' | 'BLOCKED' | 'NO_ADDRESS' | 'NO_PIN';
+type WithdrawalStep = 'AMOUNT' | 'PIN' | 'OTP_VERIFY' | 'PROCESSING' | 'SUCCESS' | 'BLOCKED' | 'NO_ADDRESS' | 'NO_PIN';
 
 const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   isOpen,
@@ -39,6 +39,33 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [withdrawalCode, setWithdrawalCode] = useState<string | null>(null);
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<{
+    amount: number;
+    chain: WithdrawalChain;
+    address: string;
+    pin: string;
+    feeRate: number;
+    feeAmount: number;
+    netArrivalUSDT: number;
+  } | null>(null);
+
+  // Restore pending withdrawal from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('pendingWithdrawal');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.amount && parsed.chain && parsed.address && parsed.pin) {
+          setPendingWithdrawal(parsed);
+          setAmount(String(parsed.amount));
+          setChain(parsed.chain);
+          setPin(parsed.pin);
+          // If we have a pending withdrawal, go directly to OTP_VERIFY step
+          setStep('OTP_VERIFY');
+        }
+      }
+    } catch {}
+  }, []);
 
   const hasPin = !!(user as any)?.withdrawalPin;
 
@@ -65,12 +92,17 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // Don't reset if we have a pending withdrawal from Telegram redirect
+      if (pendingWithdrawal) {
+        return;
+      }
       setAmount('');
       setOtpCode('');
       setPin('');
       setError('');
       setChain('TRC20');
       setWithdrawalCode(null);
+      setPendingWithdrawal(null);
       if (user?.isWithdrawalBlocked) {
         setStep('BLOCKED');
       } else if (!walletAddresses.TRC20 && !walletAddresses.BEP20) {
@@ -81,7 +113,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
         setStep('AMOUNT');
       }
     }
-  }, [user, isOpen, walletAddresses, hasPin]);
+  }, [user, isOpen, walletAddresses, hasPin, pendingWithdrawal]);
 
   const unlockBal = Number((user as any)?.unlockBalance || 0);
   const parsedAmount = parseFloat(amount) || 0;
@@ -89,8 +121,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   const feeAmount = parsedAmount * feeRate;
   const netArrivalUSDT = parsedAmount - feeAmount;
 
-  // Explicit reason why "Continue" cannot proceed (previously only a tiny error line after a click,
-  // which made the button look broken when the amount exceeded the unlock balance).
+  // Explicit reason why "Continue" cannot proceed
   const blockReason = !address || address.length < 20
     ? `No ${chain} wallet address is bound. Bind one in Settings → Withdrawal method.`
     : parsedAmount <= 0
@@ -115,60 +146,82 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
       return;
     }
     setError('');
-    setOtpCode('');
-    setOtpSent(false);
-    setStep('CONFIRM');
+    setPin('');
+    setStep('PIN');
   };
 
-  const handleConfirm = () => {
-    if (!otpCode || otpCode.trim().length !== 6) { setError('Enter the 6-digit code from the Telegram bot'); return; }
+  const handlePinConfirm = () => {
+    if (!pin || pin.length !== 6) { setError('Enter your 6-digit withdrawal PIN'); return; }
     setError('');
+    setOtpCode('');
+    // Save pending withdrawal to sessionStorage before redirect
+    const pending = {
+      amount: parsedAmount,
+      chain,
+      address,
+      pin: pin.trim(),
+      feeRate,
+      feeAmount,
+      netArrivalUSDT,
+    };
+    sessionStorage.setItem('pendingWithdrawal', JSON.stringify(pending));
+    setPendingWithdrawal(pending);
+    // Redirect to Telegram bot (full redirect works better than window.open on Vercel)
+    window.location.href = 'https://t.me/CF_withdrawVerify_bot';
     setStep('OTP_VERIFY');
   };
 
   const handleVerifyOtp = async () => {
     if (!otpCode || otpCode.trim().length !== 6) { setError('Enter the 6-digit code from the Telegram bot'); return; }
+    // Use pending withdrawal data if available (after Telegram redirect)
+    const pending = pendingWithdrawal;
+    const submitAmount = pending?.amount ?? parsedAmount;
+    const submitChain = pending?.chain ?? chain;
+    const submitAddress = pending?.address ?? address;
+    const submitPin = pending?.pin ?? pin.trim();
+    
+    if (!submitAmount || !submitAddress || !submitPin) {
+      setError('Withdrawal session expired. Please start over.');
+      setStep('AMOUNT');
+      return;
+    }
+    
     setOtpVerifying(true);
     setError('');
     try {
+      // First verify the OTP with the Telegram bot
       await api.post('/api/withdrawals/otp/verify', { code: otpCode.trim() });
-      setStep('PIN');
-    } catch (e: any) {
-      setError(e?.response?.data?.message || 'Invalid or expired code. Please get a new one from the Telegram bot.');
-      setStep('CONFIRM');
-    } finally {
-      setOtpVerifying(false);
-    }
-  };
-
-  const handlePinConfirm = async () => {
-    if (!pin || pin.length !== 6) { setError('Enter your 6-digit withdrawal PIN'); return; }
-    setIsProcessing(true);
-    setStep('PROCESSING');
-    setError('');
-    try {
+      
+      // Then submit the withdrawal with PIN
+      setIsProcessing(true);
+      setStep('PROCESSING');
+      
       const res = await api.post('/api/withdrawals', {
-        amount: parsedAmount,
-        address,
+        amount: submitAmount,
+        address: submitAddress,
         coin: 'USDT',
-        chain,
+        chain: submitChain,
         method: 'USDT',
         otpCode: otpCode.trim(),
-        pin: pin.trim(),
+        pin: submitPin,
       });
 
       if (res.data.success) {
-        onSuccess(parsedAmount);
+        // Clear pending withdrawal on success
+        sessionStorage.removeItem('pendingWithdrawal');
+        setPendingWithdrawal(null);
+        onSuccess(submitAmount);
         setWithdrawalCode(res.data.code || null);
         setStep('SUCCESS');
       } else {
         setError(res.data.message || 'Withdrawal failed. Please try again.');
-        setStep('AMOUNT');
+        setStep('PIN');
       }
     } catch (e: any) {
       setError(e.response?.data?.message || 'Network error. Please try again.');
-      setStep('AMOUNT');
+      setStep('PIN');
     } finally {
+      setOtpVerifying(false);
       setIsProcessing(false);
     }
   };
@@ -182,7 +235,8 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
         <header className="bg-primary h-14 flex items-center px-4 shrink-0 shadow-sm">
           <button
             onClick={() => {
-              if (step === 'CONFIRM') setStep('AMOUNT');
+              if (step === 'PIN') setStep('AMOUNT');
+              else if (step === 'OTP_VERIFY') setStep('PIN');
               else onClose();
             }}
             className="text-white p-1"
@@ -337,114 +391,10 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
             </div>
           )}
 
-          {step === 'CONFIRM' && (
-            <div className="space-y-5">
-              <div className="bg-primary/5 border border-primary/15 rounded-2xl p-5 text-center">
-                <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-2">Confirm Withdrawal</p>
-                <p className="text-3xl font-black text-gray-900">${netArrivalUSDT.toFixed(2)}</p>
-                <p className="text-xs text-gray-400 mt-1">After {(feeRate * 100).toFixed(0)}% withdrawal fee</p>
-              </div>
-              <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3 shadow-sm">
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Amount Requested</span>
-                  <span className="font-bold text-gray-800">${parsedAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Withdrawal Fee ({(feeRate * 100).toFixed(0)}%)</span>
-                  <span className="font-bold text-red-500">-${feeAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Net Arrival</span>
-                  <span className="font-bold text-primary">${netArrivalUSDT.toFixed(2)} USDT</span>
-                </div>
-                <div className="border-t border-gray-50 pt-3 flex justify-between text-xs">
-                  <span className="text-gray-500">Method</span>
-                  <span className="font-bold text-gray-600">USDT · {chain}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Destination</span>
-                  <code className="font-mono text-gray-600 text-[10px] max-w-[160px] truncate">{address}</code>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Get Verification Code</p>
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
-                  <p className="text-[11px] text-gray-700 text-center leading-relaxed">
-                    We no longer send codes via email. Please get your 6-digit withdrawal code from our Telegram bot:
-                  </p>
-                  <a
-                    href="https://t.me/CF_withdrawVerify_bot"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black uppercase text-sm hover:bg-blue-700 transition-all"
-                  >
-                    <i className="fa-brands fa-telegram text-lg"></i>
-                    Open CF Withdrawal Verification Bot
-                  </a>
-                  <p className="text-[9px] text-gray-500 text-center">
-                    Message the bot with your email/username to receive your withdrawal code.
-                  </p>
-                </div>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={otpCode}
-                  onChange={e => setOtpCode(e.target.value)}
-                  placeholder="Enter 6-digit code from Telegram bot"
-                  maxLength={6}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
-                />
-                {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
-              </div>
-              <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3">
-                <p className="text-[10px] text-yellow-700 font-bold text-center uppercase">
-                  Withdrawals are processed within 24 hours
-                </p>
-              </div>
-            </div>
-          )}
-
-          {step === 'OTP_VERIFY' && (
-            <div className="space-y-5">
-              <div className="bg-primary/5 border border-primary/15 rounded-2xl p-5 text-center">
-                <i className="fa-solid fa-shield-halved text-primary text-2xl mb-2"></i>
-                <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-2">Verify Code</p>
-                <p className="text-xs text-gray-400 mt-1">Enter the 6-digit code from the Telegram bot.</p>
-              </div>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={otpCode}
-                  onChange={e => setOtpCode(e.target.value)}
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
-                />
-                {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
-              </div>
-              <div className="pt-2 space-y-3">
-                <button
-                  onClick={handleVerifyOtp}
-                  disabled={otpVerifying || otpCode.trim().length !== 6}
-                  className="w-full bg-primary text-white py-4 rounded-md font-bold text-lg active:scale-[0.98] transition-all shadow-sm disabled:opacity-70 flex items-center justify-center gap-2"
-                >
-                  {otpVerifying ? <><i className="fa-solid fa-spinner animate-spin"></i> Verifying...</> : 'Verify Code'}
-                </button>
-                <button
-                  onClick={() => { setStep('CONFIRM'); setOtpCode(''); }}
-                  className="w-full text-gray-400 text-xs font-bold uppercase py-2"
-                >
-                  Go Back
-                </button>
-              </div>
-            </div>
-          )}
-
           {step === 'PIN' && (
             <div className="space-y-5">
               <div className="bg-primary/5 border border-primary/15 rounded-2xl p-5 text-center">
-                <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-2">Withdrawal PIN</p>
+                <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-2">Enter Withdrawal PIN</p>
                 <p className="text-3xl font-black text-gray-900">${netArrivalUSDT.toFixed(2)}</p>
                 <p className="text-xs text-gray-400 mt-1">After {(feeRate * 100).toFixed(0)}% withdrawal fee</p>
               </div>
@@ -483,10 +433,86 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                 />
                 {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
               </div>
-              <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3">
-                <p className="text-[10px] text-yellow-700 font-bold text-center uppercase">
-                  Withdrawals are processed within 24 hours
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                <p className="text-[11px] text-gray-700 text-center leading-relaxed">
+                  After entering your PIN, you'll be redirected to our Telegram bot to get a verification code:
                 </p>
+                <div className="flex items-center justify-center gap-2">
+                  <i className="fa-brands fa-telegram text-lg text-blue-600"></i>
+                  <span className="text-[10px] font-black text-blue-600 uppercase">t.me/CF_withdrawVerify_bot</span>
+                </div>
+                <p className="text-[9px] text-gray-500 text-center">
+                  The bot will send you a 6-digit withdrawal code.
+                </p>
+                <p className="text-[9px] text-gray-400 text-center">
+                  If redirect doesn't work, <a href="https://t.me/CF_withdrawVerify_bot" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">click here to open manually</a>.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {step === 'OTP_VERIFY' && (
+            <div className="space-y-5">
+              <div className="bg-primary/5 border border-primary/15 rounded-2xl p-5 text-center">
+                <i className="fa-solid fa-shield-halved text-primary text-2xl mb-2"></i>
+                <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-2">Verify Code</p>
+                <p className="text-xs text-gray-400 mt-1">Enter the 6-digit code from the Telegram bot.</p>
+              </div>
+              {pendingWithdrawal && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3 shadow-sm">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Amount Requested</span>
+                    <span className="font-bold text-gray-800">${pendingWithdrawal.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Withdrawal Fee ({(pendingWithdrawal.feeRate * 100).toFixed(0)}%)</span>
+                    <span className="font-bold text-red-500">-${pendingWithdrawal.feeAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Net Arrival</span>
+                    <span className="font-bold text-primary">${pendingWithdrawal.netArrivalUSDT.toFixed(2)} USDT</span>
+                  </div>
+                  <div className="border-t border-gray-50 pt-3 flex justify-between text-xs">
+                    <span className="text-gray-500">Method</span>
+                    <span className="font-bold text-gray-600">USDT · {pendingWithdrawal.chain}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Destination</span>
+                    <code className="font-mono text-gray-600 text-[10px] max-w-[160px] truncate">{pendingWithdrawal.address}</code>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value)}
+                  placeholder="Enter 6-digit code from Telegram bot"
+                  maxLength={6}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
+                />
+                {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
+              </div>
+              <div className="pt-2 space-y-3">
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={otpVerifying || otpCode.trim().length !== 6}
+                  className="w-full bg-primary text-white py-4 rounded-md font-bold text-lg active:scale-[0.98] transition-all shadow-sm disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {otpVerifying ? <><i className="fa-solid fa-spinner animate-spin"></i> Verifying...</> : 'Verify & Submit'}
+                </button>
+                <button
+                  onClick={() => { 
+                    sessionStorage.removeItem('pendingWithdrawal');
+                    setPendingWithdrawal(null);
+                    setStep('PIN'); 
+                    setOtpCode(''); 
+                  }}
+                  className="w-full text-gray-400 text-xs font-bold uppercase py-2"
+                >
+                  Go Back
+                </button>
               </div>
             </div>
           )}
@@ -509,7 +535,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
               <div>
                 <h3 className="text-lg font-black text-gray-900 uppercase">Withdrawal Submitted</h3>
                 <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  <span className="text-primary font-black">${netArrivalUSDT.toFixed(2)} USDT</span> will arrive at your wallet within 24 hours.
+                  <span className="text-primary font-black">${netArrivalUSDT.toFixed(2)} USDT</span> will be distributed within <span className="text-primary font-black">1-48 hours</span> by admin.
                 </p>
               </div>
               <div className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-left space-y-2">
@@ -527,7 +553,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[10px] text-gray-400 uppercase font-black">Status</span>
-                  <span className="text-[10px] font-black text-yellow-600">Processing</span>
+                  <span className="text-[10px] font-black text-yellow-600">Pending Admin Approval (1-48 hrs)</span>
                 </div>
                 {withdrawalCode && (
                   <div className="flex justify-between">
@@ -537,7 +563,7 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                 )}
               </div>
               <p className="text-[10px] text-gray-400 font-bold uppercase text-center">
-                Share this auth code with admin to approve your withdrawal.
+                Your withdrawal will be processed by admin within 1-48 hours.
               </p>
               <button onClick={onClose} className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase active:scale-95 transition-all">
                 Done
@@ -561,41 +587,41 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
           </div>
         )}
 
-{step === 'CONFIRM' && (
-            <div className="p-6 bg-white border-t border-gray-50 shrink-0 space-y-3">
-              <button
-                onClick={handleConfirm}
-                disabled={isProcessing}
-                className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all shadow-md"
-              >
-                Confirm Withdrawal
-              </button>
-              <button
-                onClick={() => setStep('AMOUNT')}
-                className="w-full text-gray-400 text-xs font-bold uppercase"
-              >
-                Go Back
-              </button>
-            </div>
-          )}
+        {step === 'PIN' && (
+          <div className="p-6 bg-white border-t border-gray-50 shrink-0 space-y-3">
+            <button
+              onClick={handlePinConfirm}
+              disabled={isProcessing}
+              className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all shadow-md"
+            >
+              Continue to Telegram Bot
+            </button>
+            <button
+              onClick={() => { setStep('AMOUNT'); setPin(''); }}
+              className="w-full text-gray-400 text-xs font-bold uppercase"
+            >
+              Go Back
+            </button>
+          </div>
+        )}
 
-          {step === 'PIN' && (
-            <div className="p-6 bg-white border-t border-gray-50 shrink-0 space-y-3">
-              <button
-                onClick={handlePinConfirm}
-                disabled={isProcessing}
-                className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all shadow-md"
-              >
-                {isProcessing ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Confirm Withdrawal'}
-              </button>
-              <button
-                onClick={() => { setStep('CONFIRM'); setPin(''); }}
-                className="w-full text-gray-400 text-xs font-bold uppercase"
-              >
-                Go Back
-              </button>
-            </div>
-          )}
+        {step === 'OTP_VERIFY' && (
+          <div className="p-6 bg-white border-t border-gray-50 shrink-0 space-y-3">
+            <button
+              onClick={handleVerifyOtp}
+              disabled={otpVerifying || otpCode.trim().length !== 6}
+              className="w-full bg-primary text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 transition-all shadow-md"
+            >
+              {otpVerifying ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Verify & Submit'}
+            </button>
+            <button
+              onClick={() => { setStep('PIN'); setOtpCode(''); }}
+              className="w-full text-gray-400 text-xs font-bold uppercase"
+            >
+              Go Back
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
