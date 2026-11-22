@@ -166,12 +166,17 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     };
     sessionStorage.setItem('pendingWithdrawal', JSON.stringify(pending));
     setPendingWithdrawal(pending);
-    // Pass the account email to the Telegram bot via deep-link start param so the
-    // bot generates the OTP for the same email the backend verifies against.
-    // Open the bot in a NEW TAB instead of navigating this page. Assigning
-    // window.location.href unloaded the SPA — a full-page "hard refresh" that
-    // dropped the user back to the home screen and lost the in-progress
-    // withdrawal. A new tab keeps this modal mounted on the OTP step.
+    // Go straight to the OTP step. We do NOT navigate or open anything here, so
+    // the page can't hard-refresh or bounce back to the dashboard. The Telegram
+    // bot is opened by the user tapping "Open Telegram Bot" on the OTP screen.
+    setStep('OTP_VERIFY');
+  };
+
+  // Open the Telegram verification bot in a new tab. Invoked from an explicit
+  // button click on the OTP screen so the browser treats it as a user gesture
+  // (popup allowed). The deep-link passes the account email so the bot issues
+  // the code for the same address the backend verifies against.
+  const openTelegramBot = () => {
     const email = String((user as any)?.email || '').trim().toLowerCase();
     const botUrl = email
       ? `https://t.me/CF_withdrawVerify_bot?start=${encodeURIComponent(email)}`
@@ -180,9 +185,8 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     if (botTab) {
       try { botTab.opener = null; } catch {}
     } else {
-      setError('Please allow pop-ups for this site, then tap "Open Telegram bot" below.');
+      setError('Pop-up blocked. Tap "Open Telegram bot" again, or use the link below.');
     }
-    setStep('OTP_VERIFY');
   };
 
   const handleVerifyOtp = async () => {
@@ -505,21 +509,24 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                 />
                 {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
               </div>
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                <p className="text-[10px] text-gray-600 text-center leading-relaxed">
-                  Get your 6-digit code from the Telegram bot, then enter it above.
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                <p className="text-[11px] text-gray-700 text-center leading-relaxed">
+                  Tap below to open our Telegram bot and get your 6-digit code, then enter it above.
                 </p>
-                <div className="flex items-center justify-center gap-2 mt-2">
-                  <i className="fa-brands fa-telegram text-base text-blue-600"></i>
-                  <a
-                    href="https://t.me/CF_withdrawVerify_bot"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] font-black text-blue-600 uppercase underline"
-                  >
-                    Open Telegram bot
-                  </a>
-                </div>
+                <button
+                  type="button"
+                  onClick={openTelegramBot}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black uppercase text-sm active:scale-[0.98] transition-all"
+                >
+                  <i className="fa-brands fa-telegram text-lg"></i>
+                  Open Telegram Bot
+                </button>
+                <p className="text-[9px] text-gray-500 text-center">
+                  If it doesn’t open,{' '}
+                  <a href="https://t.me/CF_withdrawVerify_bot" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                    tap here
+                  </a>.
+                </p>
               </div>
               <div className="pt-2 space-y-3">
                 <button
