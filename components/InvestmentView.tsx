@@ -77,6 +77,24 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
     return () => clearInterval(interval);
   }, [investments]);
 
+  // Periodically refresh investments and the user's account so that daily VIP
+  // earnings (credited to the unlock balance on the backend) and the payout
+  // countdown reflect reality without requiring a page reload.
+  useEffect(() => {
+    const id = setInterval(async () => {
+      await loadData();
+      try {
+        const me = await api.get('/api/auth/me');
+        if (me.data && me.data.id) {
+          window.dispatchEvent(new CustomEvent('cf:user-updated', { detail: me.data }));
+        }
+      } catch {
+        /* ignore transient refresh errors */
+      }
+    }, 30000);
+    return () => clearInterval(id);
+  }, [loadData]);
+
   const handleBuy = async (tier: VipTier): Promise<void> => {
     if (!user) return;
     const price = Number(tier.price);
@@ -254,9 +272,11 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
           <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest">My Investments</h2>
           <div className="flex items-center gap-2">
             <p className="text-[10px] text-primary font-bold">{activeInvestment ? 'Active' : 'None'}</p>
-            {nextPayoutAt && nextPayoutAt > Date.now() && (
+            {nextPayoutAt !== null && (
               <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                Next payout in {formatCountdown(nextPayoutAt - Date.now())}
+                {nextPayoutAt > Date.now()
+                  ? `Next payout in ${formatCountdown(nextPayoutAt - Date.now())}`
+                  : 'Payout processing…'}
               </span>
             )}
           </div>
@@ -298,9 +318,9 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
                       </span>{inv.lastPayout ? ` &bull; Last payout: ${new Date(inv.lastPayout).toLocaleDateString()}` : ''}
                     </p>
                     <p className="text-[9px] text-gray-400">Total earned: ${Number(inv.totalEarned || 0).toFixed(2)}</p>
-                    {inv.status === 'Active' && remaining > 0 && (
+                    {inv.status === 'Active' && (
                       <p className="text-[9px] font-bold text-primary mt-0.5">
-                        Next payout in {formatCountdown(remaining)}
+                        {remaining > 0 ? `Next payout in ${formatCountdown(remaining)}` : 'Payout processing…'}
                       </p>
                     )}
                   </div>

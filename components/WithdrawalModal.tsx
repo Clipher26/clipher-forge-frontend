@@ -168,11 +168,20 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
     setPendingWithdrawal(pending);
     // Pass the account email to the Telegram bot via deep-link start param so the
     // bot generates the OTP for the same email the backend verifies against.
+    // Open the bot in a NEW TAB instead of navigating this page. Assigning
+    // window.location.href unloaded the SPA — a full-page "hard refresh" that
+    // dropped the user back to the home screen and lost the in-progress
+    // withdrawal. A new tab keeps this modal mounted on the OTP step.
     const email = String((user as any)?.email || '').trim().toLowerCase();
     const botUrl = email
       ? `https://t.me/CF_withdrawVerify_bot?start=${encodeURIComponent(email)}`
       : 'https://t.me/CF_withdrawVerify_bot';
-    window.location.href = botUrl;
+    const botTab = window.open(botUrl, '_blank');
+    if (botTab) {
+      try { botTab.opener = null; } catch {}
+    } else {
+      setError('Please allow pop-ups for this site, then tap "Open Telegram bot" below.');
+    }
     setStep('OTP_VERIFY');
   };
 
@@ -495,6 +504,22 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-4 text-gray-800 font-bold tracking-widest text-center text-xl focus:ring-1 focus:ring-primary outline-none"
                 />
                 {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <p className="text-[10px] text-gray-600 text-center leading-relaxed">
+                  Get your 6-digit code from the Telegram bot, then enter it above.
+                </p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <i className="fa-brands fa-telegram text-base text-blue-600"></i>
+                  <a
+                    href="https://t.me/CF_withdrawVerify_bot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-black text-blue-600 uppercase underline"
+                  >
+                    Open Telegram bot
+                  </a>
+                </div>
               </div>
               <div className="pt-2 space-y-3">
                 <button
