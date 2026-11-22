@@ -229,12 +229,17 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
         setWithdrawalCode(res.data.code || null);
         setStep('SUCCESS');
       } else {
+        // Stay on the OTP screen (don't bounce back) so the user can re-enter
+        // the code — e.g. it expired or was mistyped — and submit again.
         setError(res.data.message || 'Withdrawal failed. Please try again.');
-        setStep('PIN');
+        setOtpCode('');
+        setStep('OTP_VERIFY');
       }
     } catch (e: any) {
+      // Network/server error: keep the entered code so they can retry, and
+      // stay on the OTP step instead of resetting the whole flow.
       setError(e.response?.data?.message || 'Network error. Please try again.');
-      setStep('PIN');
+      setStep('OTP_VERIFY');
     } finally {
       setOtpVerifying(false);
       setIsProcessing(false);
