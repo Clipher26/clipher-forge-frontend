@@ -30,8 +30,24 @@ import PasswordModal from './components/PasswordModal';
 
 type AppView = 'home' | 'team' | 'financial' | 'assets' | 'mine' | 'trade' | 'admin' | 'investment' | 'login' | 'signup' | 'privacy' | 'refund';
 
+const getInitialView = (): AppView => {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref');
+  if (ref) {
+    sessionStorage.setItem('referralCode', ref);
+    window.history.replaceState({}, '', '/');
+    return 'signup';
+  }
+  if (window.location.pathname === '/join') {
+    window.history.replaceState({}, '', '/');
+    const savedRef = sessionStorage.getItem('referralCode');
+    if (savedRef) return 'signup';
+  }
+  return 'home';
+};
+
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<AppView>('home');
+  const [currentView, setCurrentView] = useState<AppView>(getInitialView);
   const [selectedSymbol, setSelectedSymbol] = useState<string>('BTCUSDT');
   const [tickers, setTickers] = useState<TickerData[]>([]);
   const [user, setUser] = useState<User | null>(null);

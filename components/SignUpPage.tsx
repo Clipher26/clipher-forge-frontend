@@ -15,7 +15,7 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBack, onSuccess, onViewPrivac
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [invCode, setInvCode] = useState('');
+  const [invCode, setInvCode] = useState(() => sessionStorage.getItem('referralCode') || '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [agreed, setAgreed] = useState(false);
