@@ -5,7 +5,12 @@ import api from '../api';
 const API_URL = '';
 const TRON_USDT_ADDRESSES = ['TMcfaQSL8AjEDoyCG9kSDvgNpQo1ku4DBX','TKyS24mVA5cGrHgA2CsWufT3hY36yJLsrW','TXN8dgdLYFUDK6L6LRhbPkozJTarZCsJDZ'];
 const BSC_USDT_ADDRESSES = ['0x97C0e0ABA1c4EcCea5400d0864A33fAD1c69Cf23','0x08f424021e950134726e3b3ee628325fdbc4183b','0x037B6DcC7FaF9e4762e917521473f77829bA3cdB'];
-const getRandomAddress = (list: string[]) => list[Math.floor(Math.random()*list.length)];
+const secureRandomIndex = (max: number): number => {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % max;
+};
+const getRandomAddress = (list: string[]) => list[secureRandomIndex(list.length)];
 const NGN_RECHARGE_RATE = 1500; // ₦1,500 per $1 USDT
 const TELEGRAM_RECEIPT_BOT = 'https://t.me/ClipherForgeExchangeReceipt_bot';
 
@@ -13,11 +18,11 @@ const COMPANY_BANKS = [
   { bankName: 'PalmPay', accountNumber: '7079646853', accountName: 'Olusiku Oluwabukola' },
   { bankName: 'PALMPAY', accountNumber: '8991574608', accountName: 'OLUWABUKOLA OLUSIKU' },
   { bankName: 'WEMA BANK', accountNumber: '0452453876', accountName: 'Oluwabukola Olusiku' },
-  { bankName: 'PALMPAY', accountNumber: '8160856808', accountName: 'FATIU BELLO' },
+  { bankName: 'OPAY', accountNumber: '8160856808', accountName: 'FATIU BELLO' },
   { bankName: 'Moniepoint MFB', accountNumber: '6692031257', accountName: 'Oluwabukola Olusiku' },
 ];
 
-const getRandomBank = () => COMPANY_BANKS[Math.floor(Math.random() * COMPANY_BANKS.length)];
+const getRandomBank = () => COMPANY_BANKS[secureRandomIndex(COMPANY_BANKS.length)];
 
 interface RechargeModalProps {
   isOpen: boolean;
