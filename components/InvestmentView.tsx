@@ -33,6 +33,10 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
   const [buying, setBuying] = useState<string | null>(null);
   const [nextPayoutAt, setNextPayoutAt] = useState<number | null>(null);
 
+  // New users can only purchase VIP1 until an admin approves higher VIP tiers.
+  const vipLocked = !(user?.vipApproved);
+  const purchasableLevels = vipLocked ? [1] : [1, 2, 3, 4, 5, 6];
+
   const loadData = useCallback(async (): Promise<void> => {
     try {
       const [tRes, iRes] = await Promise.all([
@@ -200,12 +204,13 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
             );
             const color = VIP_COLORS[tier.name] || 'text-gray-500';
             const roi = ((daily * 30) / price * 100).toFixed(0);
+            const tierLocked = vipLocked && tier.level > 1;
             return (
               <button
                 key={tier.id}
-                disabled={owned || buying === tier.id || (user?.balance || 0) < price}
+                disabled={owned || buying === tier.id || (user?.balance || 0) < price || tierLocked}
                 onClick={() => handleBuy(tier)}
-                className={`relative group bg-white border rounded-2xl p-4 flex flex-col transition-all ${color} hover:shadow-md ${owned ? 'bg-gray-50 opacity-80' : ''}`}
+                className={`relative group bg-white border rounded-2xl p-4 flex flex-col transition-all ${color} hover:shadow-md ${owned ? 'bg-gray-50 opacity-80' : tierLocked ? 'bg-gray-50/60 opacity-90' : ''}`}
               >
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-1.5">
@@ -213,6 +218,11 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
                     {owned && (
                       <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                         Active
+                      </span>
+                    )}
+                    {tierLocked && (
+                      <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                        Locked
                       </span>
                     )}
                   </div>
@@ -247,6 +257,10 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
                     <div className="w-full py-2 bg-gray-100 text-gray-400 rounded-xl text-[10px] font-bold uppercase">
                       Active
                     </div>
+                  ) : tierLocked ? (
+                    <div className="w-full py-2 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-bold uppercase text-center">
+                      Admin approval required
+                    </div>
                   ) : (user?.balance || 0) < price ? (
                     <div className="w-full py-2 bg-gray-100 text-gray-400 rounded-xl text-[10px] font-bold uppercase">
                       Insufficient balance
@@ -265,6 +279,11 @@ const InvestmentView: React.FC<InvestmentViewProps> = ({ user, onBack }) => {
           Purchased amount is frozen and cannot be used for trading or withdrawal. Daily earnings are credited to your
           unlock balance, which is used for withdrawals.
         </p>
+        {vipLocked && (
+          <p className="mt-2 text-[9px] text-orange-600 font-bold italic text-center">
+            New users can only purchase VIP1. VIP2-VIP6 are locked until an admin approves your VIP access.
+          </p>
+        )}
       </div>
 
       <div className="px-4 pb-8">

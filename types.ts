@@ -119,6 +119,8 @@ export interface User {
   withdrawalPin?: string;   // hashed withdrawal PIN (sha256)
   isAdmin?: boolean;
   adminRole?: 'SUPER_ADMIN' | 'ADMIN' | 'MODERATOR' | 'SUPPORT';
+  // VIP approval gate: false => only VIP1 purchasable until admin approves higher tiers
+  vipApproved?: boolean;
   // Anti-fraud fields
   isValidated?: boolean;
   validationType?: string;

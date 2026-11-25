@@ -135,6 +135,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleVipApproval = async (userId: string, approved: boolean) => {
+    if (!window.confirm(approved ? 'Approve VIP2-VIP6 access for this user?' : 'Revoke VIP2-VIP6 access for this user?')) return;
+    try {
+      await api.patch(`/api/admin/users/${userId}/vip-approval`, { approved });
+      await loadAdminUsers();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || e?.message || 'Failed to update VIP approval');
+    }
+  };
+
   const loadUserDetail = async (userId: string) => {
     try {
       const res = await api.get(`/api/users/${userId}`);
@@ -299,12 +309,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               {user.name}
                             </p>
                           </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-[8px] text-gray-500 font-mono">{user.id}</p>
-                            <span className={`text-[7px] font-black uppercase px-1 rounded-sm ${user.role === 'Senior Officer' || user.name === 'Akinro John' ? 'bg-gold-gradient text-[#5c4014]' : (user.role === 'Admin' ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-400')}`}>
-                              {user.role === 'Senior Officer' || user.name === 'Akinro John' ? 'Senior Operator' : (user.role === 'Admin' ? 'Project Manager' : user.role)}
-                            </span>
-                          </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <p className="text-[8px] text-gray-500 font-mono">{user.id}</p>
+                              <span className={`text-[7px] font-black uppercase px-1 rounded-sm ${user.role === 'Senior Officer' || user.name === 'Akinro John' ? 'bg-gold-gradient text-[#5c4014]' : (user.role === 'Admin' ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-400')}`}>
+                                {user.role === 'Senior Officer' || user.name === 'Akinro John' ? 'Senior Operator' : (user.role === 'Admin' ? 'Project Manager' : user.role)}
+                              </span>
+                              {user.vipApproved ? (
+                                <span className="text-[7px] font-black uppercase px-1 rounded-sm bg-green-500/20 text-green-400">VIP Open</span>
+                              ) : (
+                                <span className="text-[7px] font-black uppercase px-1 rounded-sm bg-gray-500/20 text-gray-500">VIP Locked</span>
+                              )}
+                            </div>
                         </div>
                       </td>
                     <td className="py-4">
@@ -327,6 +342,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <button onClick={() => handleUserUpdate(user.id, { isRechargeBlocked: !user.isRechargeBlocked })} className="w-7 h-7 bg-white/5 rounded flex items-center justify-center text-gray-400 hover:text-white" title="Block Recharge"><i className="fa-solid fa-indian-rupee-sign text-xs"></i></button>
                         <button onClick={() => { const b = prompt('Set balance:'); if(b) handleUserUpdate(user.id, { balance: parseFloat(b) }) }} className="w-7 h-7 bg-white/5 rounded flex items-center justify-center text-gray-400 hover:text-white" title="Edit Balance"><i className="fa-solid fa-plus text-xs"></i></button>
                         <button onClick={() => handleClearRecharge(user.id)} className="w-7 h-7 bg-white/5 rounded flex items-center justify-center text-red-500/50 hover:text-red-500" title="Clear Recharge"><i className="fa-solid fa-eraser text-xs"></i></button>
+                        <button onClick={() => handleVipApproval(user.id, !user.vipApproved)} className="w-7 h-7 bg-white/5 rounded flex items-center justify-center text-gray-400 hover:text-white" title={user.vipApproved ? 'Revoke VIP access' : 'Approve VIP access'}><i className={user.vipApproved ? 'fa-solid fa-lock text-xs' : 'fa-solid fa-lock-open text-xs'}></i></button>
                       </div>
                     </td>
                   </tr>
