@@ -195,7 +195,9 @@ const App: React.FC = () => {
       ]);
       setTradeRecords(Array.isArray(tr.data) ? tr.data : []);
       setTransactions(Array.isArray(tx.data) ? tx.data : []);
-      setActiveSignal(Array.isArray(sg.data) && sg.data[0] ? sg.data[0] : null);
+      const loadedSignals = Array.isArray(sg.data) ? sg.data : [];
+      setSignals(loadedSignals);
+      setActiveSignal(loadedSignals[0] || null);
     } catch {}
   };
 
