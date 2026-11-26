@@ -440,7 +440,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-xs text-gray-500">No active signals.</p>
                 ) : signals.map(signal => (
                   <div key={signal.id} className="py-3 border-b border-white/5 last:border-0 flex items-center justify-between text-xs">
-                    <div className="text-white font-bold">{signal.symbol} <span className={signal.direction==='CALL'?'text-positive':'text-negative'}>{signal.direction}</span> • {String(signal.period||'').toUpperCase()} • {signal.yield}</div>
+                    <div className="text-white font-bold">{signal.symbol} <span className={signal.direction==='CALL'?'text-positive':'text-negative'}>{signal.direction === 'CALL' ? 'LONG' : 'SHORT'}</span> • {String(signal.period||'').toUpperCase()} • {signal.yield}</div>
                     <div className="text-gray-500">{signal.expiresAt ? `Expires ${new Date(signal.expiresAt).toLocaleTimeString()}` : signal.time}</div>
                   </div>
                 ))}

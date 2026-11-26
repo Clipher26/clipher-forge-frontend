@@ -259,7 +259,7 @@ const AdminCfMessenger: React.FC = () => {
               <input
                 value={signalName}
                 onChange={(e) => setSignalName(e.target.value)}
-                placeholder="e.g. BTCUSDT CALL, ETHUSDT PUT"
+                placeholder="e.g. BTCUSDT LONG, ETHUSDT SHORT"
                 className="mt-1 w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-bybit/40"
               />
             </div>
@@ -375,7 +375,7 @@ const AdminCfMessenger: React.FC = () => {
 Your broadcast message here...`}
           </div>
           <div className="bg-black/30 border border-white/5 rounded-xl p-3 font-mono whitespace-pre-wrap">
-{`⏳ <b>Signal Countdown: BTCUSDT CALL</b>
+{`⏳ <b>Signal Countdown: BTCUSDT LONG</b>
 
 Time remaining: <b>5m 0s</b>
 

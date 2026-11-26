@@ -65,7 +65,7 @@ const AdminSignalPanel: React.FC<Props> = ({ onCreated }) => {
 
       // Also send signal countdown to CF Messenger (Telegram channel)
       try {
-        const signalName = `${symbol} ${direction}`;
+        const signalName = `${symbol} ${direction === 'CALL' ? 'LONG' : 'SHORT'}`;
         await api.post('/api/admin/cf-messenger/signal-countdown', {
           signalName,
           secondsRemaining: 600, // 10 minutes = 600 seconds
@@ -114,7 +114,7 @@ const AdminSignalPanel: React.FC<Props> = ({ onCreated }) => {
       {(active || cycleSignal) && (
         <div className="bg-black/40 border border-bybit/20 rounded-xl p-4 text-xs space-y-1">
           <p className="text-bybit font-black uppercase mb-1">{(active && !isExpired) ? 'Active Signal (10 min from submit)' : 'Cycle Signal'}</p>
-          <p className="text-white font-bold">{(active || cycleSignal)?.symbol} • {(active || cycleSignal)?.direction} • {String((active || cycleSignal)?.period || '').toUpperCase()} • {(active || cycleSignal)?.yield}</p>
+          <p className="text-white font-bold">{(active || cycleSignal)?.symbol} • {(active || cycleSignal)?.direction === 'CALL' ? 'LONG' : 'SHORT'} • {String((active || cycleSignal)?.period || '').toUpperCase()} • {(active || cycleSignal)?.yield}</p>
           {(active || cycleSignal)?.createdAt && <p className="text-gray-400">Submitted: {new Date(String((active || cycleSignal)?.createdAt)).toLocaleString()}</p>}
           {(active || cycleSignal)?.expiresAt && <p className={isExpired ? 'text-red-400 font-bold' : 'text-positive font-bold'}>Valid 10 min: {isExpired ? 'Expired' : `Expires in ${expiresIn}`} (at {new Date(String((active || cycleSignal)?.expiresAt)).toLocaleString()})</p>}
           {locked && resetAt && <p className="text-yellow-500">New signal allowed after reset: {new Date(resetAt).toLocaleString()} {resetIn ? `(in ${resetIn})` : ''}</p>}
@@ -132,8 +132,8 @@ const AdminSignalPanel: React.FC<Props> = ({ onCreated }) => {
         <div className="space-y-2">
           <label className="text-[10px] text-gray-400 font-black uppercase">Direction</label>
           <div className="flex gap-2">
-            <button onClick={()=>setDirection('CALL')} disabled={locked} className={`flex-1 py-3 rounded-xl font-black ${direction==='CALL'?'bg-positive text-white':'bg-white/5 text-gray-400'}`}>CALL</button>
-            <button onClick={()=>setDirection('PUT')} disabled={locked} className={`flex-1 py-3 rounded-xl font-black ${direction==='PUT'?'bg-negative text-white':'bg-white/5 text-gray-400'}`}>PUT</button>
+            <button onClick={()=>setDirection('CALL')} disabled={locked} className={`flex-1 py-3 rounded-xl font-black ${direction==='CALL'?'bg-positive text-white':'bg-white/5 text-gray-400'}`}>LONG</button>
+            <button onClick={()=>setDirection('PUT')} disabled={locked} className={`flex-1 py-3 rounded-xl font-black ${direction==='PUT'?'bg-negative text-white':'bg-white/5 text-gray-400'}`}>SHORT</button>
           </div>
         </div>
         <div className="space-y-2">

@@ -107,7 +107,7 @@ const TradeView: React.FC<TradeViewProps> = ({ symbol, ticker, onBack, user, onP
         {sigActive && (
           <div className="bg-bybit/10 border border-bybit/30 rounded-xl p-3 text-[11px]">
             <p className="font-black text-bybit uppercase">Active Admin Signal (applies to any crypto)</p>
-            <p className="text-gray-700 font-bold mt-1">{activeSignal.symbol} • {activeSignal.direction} • {String(activeSignal.period||'').toUpperCase()} • {activeSignal.yield} • expires {new Date(activeSignal.expiresAt).toLocaleTimeString()}</p>
+            <p className="text-gray-700 font-bold mt-1">{activeSignal.symbol} • {activeSignal.direction === 'CALL' ? 'LONG' : 'SHORT'} • {String(activeSignal.period||'').toUpperCase()} • {activeSignal.yield} • expires {new Date(activeSignal.expiresAt).toLocaleTimeString()}</p>
             <p className="text-gray-500 mt-1">Trades after expiry may result in loss.</p>
           </div>
         )}
@@ -121,7 +121,7 @@ const TradeView: React.FC<TradeViewProps> = ({ symbol, ticker, onBack, user, onP
                 tradeDirection === 'CALL' ? 'bg-positive text-white' : 'bg-gray-100 text-gray-500'
               }`}
             >
-              CALL
+              LONG
             </button>
             <button 
               onClick={() => setTradeDirection('PUT')}
@@ -129,7 +129,7 @@ const TradeView: React.FC<TradeViewProps> = ({ symbol, ticker, onBack, user, onP
                 tradeDirection === 'PUT' ? 'bg-negative text-white' : 'bg-gray-100 text-gray-500'
               }`}
             >
-              PUT
+              SHORT
             </button>
           </div>
         </div>
@@ -176,7 +176,7 @@ const TradeView: React.FC<TradeViewProps> = ({ symbol, ticker, onBack, user, onP
         <div className="flex justify-between items-start text-center border-t border-gray-50 pt-6">
           <div className="flex-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Direction</p>
-            <p className="text-xs font-bold text-positive">{tradeDirection}</p>
+            <p className="text-xs font-bold text-positive">{tradeDirection === 'CALL' ? 'LONG' : 'SHORT'}</p>
           </div>
           <div className="flex-1">
             <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Price</p>
