@@ -35,6 +35,18 @@ type WithdrawalRow = {
   createdAt?: string;
 };
 
+type AdminTab =
+  | 'USERS'
+  | 'SALARY'
+  | 'INVESTMENT'
+  | 'SIGNALS'
+  | 'WD_AUTH'
+  | 'TREASURY'
+  | 'SESSIONS'
+  | 'MESSAGES'
+  | 'WITHDRAWALS'
+  | 'CF_MESSENGER';
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   isOpen,
   onClose,
@@ -51,7 +63,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [salaryForm, setSalaryForm] = useState<Record<string, { amount: string; frequency: string; proofNote: string }>>({});
   const [salaryBusy, setSalaryBusy] = useState<string | null>(null);
   const [salaryMsg, setSalaryMsg] = useState('');
-  const [activeTab, setActiveTab] = useState<'USERS' | 'SALARY' | 'INVESTMENT' | 'SIGNALS' | 'WD_AUTH' | 'TREASURY' | 'SESSIONS' | 'MESSAGES' | 'WITHDRAWALS'>('USERS');
+  const [activeTab, setActiveTab] = useState<AdminTab>('USERS');
   const [isEditingWallet, setIsEditingWallet] = useState(false);
   const [tempWallet, setTempWallet] = useState(adminWalletAddress);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -180,7 +192,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar max-w-full">
           <div className="flex bg-black/20 rounded-lg p-1">
-            {['USERS', 'SALARY', 'INVESTMENT', 'WITHDRAWALS', 'MESSAGES', 'SIGNALS', 'WD_AUTH', 'TREASURY', 'SESSIONS', 'CF_MESSENGER'].map((tab: any) => (
+            {(['USERS', 'SALARY', 'INVESTMENT', 'WITHDRAWALS', 'MESSAGES', 'SIGNALS', 'WD_AUTH', 'TREASURY', 'SESSIONS', 'CF_MESSENGER'] as AdminTab[]).map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}

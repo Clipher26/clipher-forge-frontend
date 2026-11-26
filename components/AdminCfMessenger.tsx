@@ -38,7 +38,11 @@ const AdminCfMessenger: React.FC = () => {
       const res = await api.get('/api/admin/cf-messenger/status');
       setStatus(res.data);
     } catch (e: any) {
-      setStatus({ configured: false });
+      setStatus({
+        configured: false,
+        canSend: false,
+        error: e?.response?.data?.message || e?.message || 'Failed to load CF Messenger status.',
+      });
     } finally {
       setLoadingStatus(false);
     }
@@ -138,15 +142,19 @@ const AdminCfMessenger: React.FC = () => {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
           <div className="text-center py-8">
             <i className="fa-solid fa-triangle-exclamation text-red-500 text-4xl mb-3"></i>
-            <h3 className="text-white font-black uppercase italic tracking-wider text-lg">CF Messenger Not Configured</h3>
+            <h3 className="text-white font-black uppercase italic tracking-wider text-lg">
+              {status?.error ? 'CF Messenger Status Unavailable' : 'CF Messenger Not Configured'}
+            </h3>
             <p className="text-gray-500 text-xs mt-2 max-w-md mx-auto">
-              The CF Messenger bot is not configured. Please set the following environment variables on the server:
+              {status?.error || 'The CF Messenger bot is not configured. Please set the following environment variables on the server:'}
             </p>
-            <div className="bg-black/40 border border-white/10 rounded-xl p-4 mt-4 text-left max-w-md mx-auto space-y-2 font-mono text-[10px]">
-              <code className="text-bybit">CF_MESSENGER_BOT_TOKEN</code> - Bot token from <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-bybit underline">@BotFather</a>
-              <br />
-              <code className="text-bybit">CF_MESSENGER_CHAT_ID</code> - Channel/Group chat ID (e.g. <code className="text-gray-400">-1001234567890</code> or <code className="text-gray-400">@channelname</code>)
-            </div>
+            {!status?.error && (
+              <div className="bg-black/40 border border-white/10 rounded-xl p-4 mt-4 text-left max-w-md mx-auto space-y-2 font-mono text-[10px]">
+                <code className="text-bybit">CF_MESSENGER_BOT_TOKEN</code> - Bot token from <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-bybit underline">@BotFather</a>
+                <br />
+                <code className="text-bybit">CF_MESSENGER_CHAT_ID</code> - Channel/Group chat ID (e.g. <code className="text-gray-400">-1001234567890</code> or <code className="text-gray-400">@channelname</code>)
+              </div>
+            )}
             <button onClick={loadStatus} className="mt-4 px-4 py-2 bg-bybit text-black text-[10px] font-black uppercase rounded-xl hover:bg-white transition-all">
               Retry Check
             </button>
