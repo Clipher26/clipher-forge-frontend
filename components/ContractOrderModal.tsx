@@ -1,6 +1,7 @@
 
-import React from 'react';
-import { TradeRecord } from '../types';
+import React, { useEffect, useState } from 'react';
+import api from '../api';
+import { Investment, TradeRecord } from '../types';
 
 interface ContractOrderModalProps {
   isOpen: boolean;
@@ -8,7 +9,36 @@ interface ContractOrderModalProps {
   trades: TradeRecord[];
 }
 
+const formatPlanDate = (value?: string | null) => value ? new Date(value).toLocaleString() : '—';
+
 const ContractOrderModal: React.FC<ContractOrderModalProps> = ({ isOpen, onClose, trades }) => {
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [loadingInvestments, setLoadingInvestments] = useState(false);
+  const [investmentError, setInvestmentError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoadingInvestments(true);
+    setInvestmentError('');
+    api.get('/api/vip/investments')
+      .then((res) => {
+        if (cancelled) return;
+        const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        const now = Date.now();
+        setInvestments(data.filter((inv: Investment) =>
+          inv.status === 'Active' && (!inv.expiresAt || new Date(inv.expiresAt).getTime() > now),
+        ));
+      })
+      .catch(() => {
+        if (!cancelled) setInvestmentError('Unable to load the active investment plan.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingInvestments(false);
+      });
+    return () => { cancelled = true; };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const now = Date.now();
@@ -27,6 +57,37 @@ const ContractOrderModal: React.FC<ContractOrderModalProps> = ({ isOpen, onClose
           </button>
           <h2 className="ml-4 text-white font-bold text-sm tracking-tight uppercase italic">Contract Order</h2>
         </header>
+
+        <div className="bg-[#f8f8f8] border-b border-gray-100 px-6 py-4">
+          <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-black uppercase tracking-widest">ACTIVE INVESTMENT PLAN</span>
+        </div>
+
+        <div className="border-b border-gray-100 bg-white">
+          {loadingInvestments ? (
+            <div className="px-6 py-5 text-xs text-gray-400">Loading investment plan...</div>
+          ) : investmentError ? (
+            <div className="px-6 py-5 text-xs text-red-500">{investmentError}</div>
+          ) : investments.length === 0 ? (
+            <div className="px-6 py-5 text-xs text-gray-400">No active investment plan.</div>
+          ) : investments.map((investment) => (
+            <div key={investment.id} className="px-6 py-5 border-b border-gray-50 last:border-0">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-black text-gray-900 uppercase">{investment.tierName}</p>
+                <span className="text-[10px] bg-green-50 text-green-600 px-2 py-1 rounded font-black uppercase">Active</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Next payout date</span>
+                  <span className="text-[11px] font-bold text-gray-700">{investment.nextPayoutAt ? formatPlanDate(investment.nextPayoutAt) : 'No further payouts'}</span>
+                </div>
+                <div className="flex flex-col text-right">
+                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Plan expiration date</span>
+                  <span className="text-[11px] font-bold text-gray-700">{investment.expiresAt ? formatPlanDate(investment.expiresAt) : 'Not set'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
         <div className="bg-[#f8f8f8] border-b border-gray-100 px-6 py-4">
           <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-black uppercase tracking-widest">WEEKLY NODES</span>

@@ -152,6 +152,9 @@ export interface Investment {
   status: 'Active' | 'Cancelled' | 'Expired';
   frozenAt?: string;
   lastPayout?: string;
+  nextPayoutAt?: string | null;
+  expiresAt?: string;
+  isActive?: boolean;
   totalEarned?: string;
   createdAt?: string;
 }
