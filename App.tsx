@@ -48,6 +48,7 @@ const getInitialView = (): AppView => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(getInitialView);
+  const [isTelegramInviteOpen, setIsTelegramInviteOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string>('BTCUSDT');
   const [tickers, setTickers] = useState<TickerData[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -260,17 +261,20 @@ const App: React.FC = () => {
     try { await getSupabase().auth.signOut(); } catch {}
     try { await api.post('/api/auth/logout', {}); } catch {}
     setUser(null);
+    setIsTelegramInviteOpen(false);
     setCurrentView('home');
   };
 
   const handleSignUpSuccess = (u: User) => {
     applyUser(u);
     setCurrentView('home');
+    setIsTelegramInviteOpen(true);
   };
 
   const handleLoginSuccess = (u: User) => {
     applyUser(u);
     setCurrentView((u as any).isAdmin ? 'admin' : 'home');
+    setIsTelegramInviteOpen(true);
   };
 
   if (currentView === 'signup') return <SignUpPage onBack={() => setCurrentView('login')} onSuccess={handleSignUpSuccess} onViewPrivacy={() => setCurrentView('privacy')} onViewRefund={() => setCurrentView('refund')} />;
@@ -404,6 +408,41 @@ const App: React.FC = () => {
       {user && <PasswordModal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} user={user} />}
       {policyView === 'privacy' && <div className="fixed inset-0 z-[120] bg-white overflow-y-auto"><PrivacyPolicy onBack={() => setPolicyView('none')} /></div>}
       {policyView === 'refund' && <div className="fixed inset-0 z-[120] bg-white overflow-y-auto"><RefundPolicy onBack={() => setPolicyView('none')} /></div>}
+      {isTelegramInviteOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-6">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="telegram-invite-title"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl"
+          >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 text-sky-500">
+              <i className="fa-brands fa-telegram text-3xl" aria-hidden="true"></i>
+            </div>
+            <h2 id="telegram-invite-title" className="text-lg font-black text-gray-900">
+              Join us on Telegram
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Connect with the Clipher Forge community for updates.
+            </p>
+            <a
+              href="https://t.me/+IphfEsPFCtcwYzc0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 block w-full rounded-xl bg-sky-500 px-4 py-3 text-sm font-black text-white hover:bg-sky-600"
+            >
+              Join Telegram
+            </a>
+            <button
+              type="button"
+              onClick={() => setIsTelegramInviteOpen(false)}
+              className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </section>
+        </div>
+      )}
     </div>
   );
 };
