@@ -9,6 +9,9 @@ interface AdminWithdrawalsProps {
 type WR = {
   id: string;
   userId: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  userPhone?: string | null;
   amount: string | number;
   address?: string;
   coin?: string;
@@ -26,25 +29,32 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const userName = (id: string) => users.find((u) => u.id === id)?.name || id;
-  const userPhone = (id: string) => (users.find((u) => u.id === id) as any)?.phone || '';
+  const userName = (w: WR) => w.userName || users.find((u) => u.id === w.userId)?.name || w.userId || 'Unknown user';
+  const userPhone = (w: WR) => w.userPhone || (users.find((u) => u.id === w.userId) as any)?.phone || w.userId;
+  const formatDate = (value?: string) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+  };
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/api/admin/withdrawals');
+      const res = await api.get('/api/admin/withdrawals', { params: { _t: Date.now() } });
       setItems(Array.isArray(res.data) ? res.data : []);
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Failed to load withdrawals (admin auth required).');
-      setItems([]);
+      if (!silent) setItems([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
+    const interval = window.setInterval(() => load(true), 15000);
+    return () => window.clearInterval(interval);
   }, [load]);
 
   const act = async (id: string, status: 'Completed' | 'Rejected') => {
@@ -76,7 +86,7 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
               Approve or reject — users are notified automatically (rejections refund balance)
             </p>
           </div>
-          <button onClick={load} className="text-[10px] text-bybit font-black uppercase">Refresh</button>
+          <button onClick={() => load()} className="text-[10px] text-bybit font-black uppercase">Refresh</button>
         </div>
         {error && <p className="mt-3 text-xs text-red-400 font-bold">{error}</p>}
       </div>
@@ -105,8 +115,8 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
                 return (
                   <tr key={w.id} className="hover:bg-white/5">
                     <td className="py-3 pl-2">
-                      <p className="text-white font-bold text-xs">{userName(w.userId)}</p>
-                      <p className="text-[8px] text-gray-500 font-mono">{userPhone(w.userId) || w.userId}</p>
+                      <p className="text-white font-bold text-xs">{userName(w)}</p>
+                      <p className="text-[8px] text-gray-500 font-mono">{userPhone(w)}</p>
                     </td>
                     <td className="py-3 text-green-500 font-mono text-xs font-bold">${Number(w.amount).toFixed(2)}</td>
                     <td className="py-3">
@@ -131,7 +141,7 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
                         st === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
                       }`}>{w.status}</span>
                     </td>
-                    <td className="py-3 text-[10px] text-gray-500">{w.createdAt ? new Date(w.createdAt).toLocaleString() : '-'}</td>
+                    <td className="py-3 text-[10px] text-gray-500">{formatDate(w.createdAt)}</td>
                     <td className="py-3 text-right pr-2">
                       {pending ? (
                         <div className="flex justify-end gap-2">
