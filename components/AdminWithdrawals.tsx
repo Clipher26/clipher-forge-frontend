@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../api';
 import { User } from '../types';
 
@@ -28,6 +28,7 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const actionLock = useRef<string | null>(null);
 
   const userName = (w: WR) => w.userName || users.find((u) => u.id === w.userId)?.name || w.userId || 'Unknown user';
   const userPhone = (w: WR) => w.userPhone || (users.find((u) => u.id === w.userId) as any)?.phone || w.userId;
@@ -58,6 +59,9 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
   }, [load]);
 
   const act = async (id: string, status: 'Completed' | 'Rejected') => {
+    if (actionLock.current) return;
+    actionLock.current = id;
+    setBusy(id);
     let reason: string | undefined;
     let txId: string | undefined;
     if (status === 'Rejected') {
@@ -65,13 +69,13 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
     } else {
       txId = window.prompt('Optional TX/reference ID:') || undefined;
     }
-    setBusy(id);
     try {
       await api.post(`/api/admin/withdrawals/${id}/status`, { status, reason, txId });
       await load();
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Action failed.');
     } finally {
+      actionLock.current = null;
       setBusy(null);
     }
   };
@@ -146,14 +150,14 @@ const AdminWithdrawals: React.FC<AdminWithdrawalsProps> = ({ users }) => {
                       {pending ? (
                         <div className="flex justify-end gap-2">
                           <button
-                            disabled={busy === w.id}
+                            disabled={!!busy}
                             onClick={() => act(w.id, 'Completed')}
                             className="px-3 py-1.5 bg-green-600/20 text-green-500 rounded text-[9px] font-black uppercase hover:bg-green-600 hover:text-white disabled:opacity-50"
                           >
                             Approve
                           </button>
                           <button
-                            disabled={busy === w.id}
+                            disabled={!!busy}
                             onClick={() => act(w.id, 'Rejected')}
                             className="px-3 py-1.5 bg-red-600/20 text-red-500 rounded text-[9px] font-black uppercase hover:bg-red-600 hover:text-white disabled:opacity-50"
                           >
